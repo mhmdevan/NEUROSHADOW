@@ -1,0 +1,11 @@
+node_modules
+.next
+out
+dist
+.env
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+coverage
+pnpm-debug.log*

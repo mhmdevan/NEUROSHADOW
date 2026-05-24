@@ -1,0 +1,43 @@
+{
+  "name": "neuroshadow",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI Cognitive Collapse Prediction Dashboard for educational research demonstrations.",
+  "scripts": {
+    "dev": "next dev --port 3030",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --max-warnings=0",
+    "test": "vitest run",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "RUST_BACKTRACE=full RUST_LOG=debug prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "db:seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "clsx": "2.1.1",
+    "framer-motion": "^12.40.0",
+    "lucide-react": "1.14.0",
+    "next": "16.2.4",
+    "react": "19.2.5",
+    "react-dom": "19.2.5",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "25.8.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "eslint": "9.28.0",
+    "eslint-config-next": "16.2.4",
+    "jsdom": "^29.1.1",
+    "prisma": "6.19.3",
+    "tsx": "4.19.4",
+    "typescript": "5.8.3",
+    "vite": "6.3.7",
+    "vitest": "^3.2.4"
+  },
+  "packageManager": "pnpm@10.26.1+sha512.664074abc367d2c9324fdc18037097ce0a8f126034160f709928e9e9f95d98714347044e5c3164d65bd5da6c59c6be362b107546292a8eecb7999196e5ce58fa"
+}

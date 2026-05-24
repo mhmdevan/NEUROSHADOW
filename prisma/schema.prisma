@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Local emergency demo uses SQLite so the project runs without a PostgreSQL server.
+// For production PostgreSQL, change provider to "postgresql" and set DATABASE_URL
+// to a PostgreSQL connection string as shown in .env.example.
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id          String           @id @default(cuid())
+  sessionId   String           @unique
+  mode        String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  snapshots   MetricSnapshot[]
+  reports     Report[]
+}
+
+model MetricSnapshot {
+  id            String   @id @default(cuid())
+  sessionId     String
+  focus         Int
+  cognitiveLoad Int
+  fatigue       Int
+  stress        Int
+  stability     Int
+  collapseRisk  Int
+  signalQuality Int
+  createdAt     DateTime @default(now())
+  session       Session? @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+model Alert {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  type        String
+  createdAt   DateTime @default(now())
+}
+
+model Report {
+  id        String   @id @default(cuid())
+  sessionId String
+  summary   String
+  riskLevel String
+  content   String
+  createdAt DateTime @default(now())
+  session   Session? @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+model Feedback {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  message   String
+  rating    Int
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  details   String
+  createdAt DateTime @default(now())
+}
