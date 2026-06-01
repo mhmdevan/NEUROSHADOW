@@ -39,7 +39,7 @@ export async function getPrismaOrNull() {
     globalForPrisma.lastDatabaseCheck = now;
     return prisma;
   } catch (error) {
-    console.warn("NEUROSHADOW database unavailable, using mock mode:", toErrorMessage(error));
+    console.warn("NeuroShadow database unavailable, using mock mode:", toErrorMessage(error));
     globalForPrisma.databaseStatus = "mock";
     globalForPrisma.lastDatabaseCheck = now;
     return null;

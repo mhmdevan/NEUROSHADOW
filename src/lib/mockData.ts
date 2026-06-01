@@ -198,6 +198,6 @@ export function createInitialMetricHistory(length = 32): CognitiveMetrics[] {
 
 export function getDatabaseModeText(database: "connected" | "mock") {
   return database === "connected"
-    ? "Database mode active: Prisma persistence enabled."
+    ? "Database mode active: your session data can be saved securely."
     : "Demo mode active: using simulated cognitive data.";
 }

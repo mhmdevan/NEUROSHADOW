@@ -41,6 +41,6 @@ export async function DELETE(request: Request) {
     ok: true,
     mode: "database",
     deleted: true,
-    message: "All user-owned NEUROSHADOW data was deleted.",
+    message: "All user-owned NeuroShadow data was deleted.",
   });
 }

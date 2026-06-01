@@ -693,7 +693,6 @@ export function DashboardApp({ user }: { user: DashboardUser }) {
             <strong>{t.app.signedInAs}</strong>
             {user.name} · {user.email}
           </span>
-          <a className="secondary-button" href="/panel">{t.app.userPanel}</a>
           <button className="secondary-button" type="button" onClick={logout}>
             <LogOut size={18} />
             {t.app.logout}

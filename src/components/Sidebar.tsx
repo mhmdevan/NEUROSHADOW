@@ -49,7 +49,7 @@ export function Sidebar({ activeSection, onNavigate, secureToken, databaseMode }
           <Activity size={24} />
         </div>
         <div>
-          <strong>NEUROSHADOW</strong>
+          <strong>{t.app.brandName}</strong>
           <span>{t.app.monitor}</span>
         </div>
       </div>

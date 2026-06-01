@@ -91,7 +91,10 @@ export function FeedbackForm({ onResult }: FeedbackFormProps) {
           />
         </label>
         <label>
-          {t.feedback.email} <span className="optional-label">{t.feedback.optional}</span>
+          <span className="label-row">
+            <span>{t.feedback.email}</span>
+            <span className="optional-label">({t.feedback.optional})</span>
+          </span>
           <input
             type="email"
             value={form.email}

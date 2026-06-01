@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, CalendarDays, CheckCircle2, Clock3, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle2, Clock3, LayoutDashboard, ShieldCheck } from "lucide-react";
 import { ModeBadge } from "./ModeBadge";
 import { languageMeta, type Language } from "@/lib/i18n";
 import { sensorSettingsToList, type SensorPrivacySettings } from "@/lib/privacy";
@@ -39,7 +39,7 @@ export function Topbar({
   return (
     <header className="topbar">
       <div>
-        <p className="eyebrow">NEUROSHADOW</p>
+        <p className="eyebrow">{t.app.brandName}</p>
         <h1>{t.app.subtitle}</h1>
         <span className="topbar__subtitle">{t.app.liveStatus}</span>
       </div>
@@ -62,6 +62,10 @@ export function Topbar({
           <ShieldCheck size={16} />
           {t.app.researchMode}
         </span>
+        <a className="topbar-panel-link" href="/panel">
+          <LayoutDashboard size={16} />
+          {t.app.userPanel}
+        </a>
         <ModeBadge mode={databaseMode} />
         <span className="pill">
           <CheckCircle2 size={16} />

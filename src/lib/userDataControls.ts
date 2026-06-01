@@ -1,7 +1,7 @@
 import type { AuthenticatedUser } from "./auth";
 
 export const userDataDisclaimer =
-  "NEUROSHADOW is an educational and research demonstration. It uses simulated and browser-derived aggregate data and does not provide medical diagnosis, treatment, or health recommendations.";
+  "NeuroShadow is an educational and research demonstration. It uses simulated and browser-derived aggregate data and does not provide medical diagnosis, treatment, or health recommendations.";
 
 export function userOwnedWhere(userId: string) {
   return { userId };

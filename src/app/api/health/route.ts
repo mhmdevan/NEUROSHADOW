@@ -9,7 +9,7 @@ export async function GET() {
 
   return safeJson({
     status: "ok",
-    service: "NEUROSHADOW API",
+    service: "NeuroShadow API",
     timestamp: new Date().toISOString(),
     database,
     apiErrors: getApiErrorSummary(),

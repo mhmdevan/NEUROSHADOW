@@ -3,10 +3,10 @@ import type { Language } from "./i18n";
 import { sanitizeText } from "./security";
 
 export const projectDisclaimer =
-  "NEUROSHADOW is an educational and research demonstration. It uses simulated data and does not provide medical diagnosis, treatment, or health recommendations.";
+  "NeuroShadow is an educational and research demonstration. It uses simulated data and does not provide medical diagnosis, treatment, or health recommendations.";
 
 export const projectDisclaimerFa =
-  "NEUROSHADOW یک نمونه آموزشی و پژوهشی است. این سامانه از داده‌های شبیه‌سازی‌شده استفاده می‌کند و تشخیص پزشکی، درمان یا توصیه سلامت ارائه نمی‌دهد.";
+  "نورو شَدو یک نمونه آموزشی و پژوهشی است. این سامانه از داده‌های شبیه‌سازی‌شده استفاده می‌کند و تشخیص پزشکی، درمان یا توصیه سلامت ارائه نمی‌دهد.";
 
 export function getProjectDisclaimer(language: Language) {
   return language === "fa" ? projectDisclaimerFa : projectDisclaimer;
@@ -104,7 +104,7 @@ export function generateLocalizedReport(metrics: CognitiveMetrics, language: Lan
 
   const content = isFa
     ? [
-        "گزارش هوش مصنوعی NEUROSHADOW",
+        "گزارش هوش مصنوعی نورو شَدو",
         `زمان تولید: ${formatReportTimestamp(timestamp, language)}`,
         "",
         `خلاصه: ${summary}`,
@@ -118,7 +118,7 @@ export function generateLocalizedReport(metrics: CognitiveMetrics, language: Lan
         `سلب مسئولیت: ${disclaimer}`,
       ].join("\n")
     : [
-        "NEUROSHADOW AI REPORT",
+        "NeuroShadow AI REPORT",
         `Generated: ${timestamp}`,
         "",
         `Summary: ${summary}`,

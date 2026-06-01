@@ -11,7 +11,7 @@ export function AboutSection() {
       <div className="panel__header">
         <div>
           <p className="eyebrow">{t.about.eyebrow}</p>
-          <h2 id="about-title">NEUROSHADOW</h2>
+          <h2 id="about-title">{t.app.brandName}</h2>
         </div>
         <span className="panel__badge">{t.about.badge}</span>
       </div>

@@ -31,6 +31,7 @@ type Overview = {
 
 const copy = {
   en: {
+    brandName: "NeuroShadow",
     title: "User Panel",
     subtitle: "Private workspace data for the signed-in researcher.",
     language: "فارسی",
@@ -41,7 +42,7 @@ const copy = {
     joined: "Joined",
     privacy: "Data separation",
     privacyText:
-      "Metrics, reports, feedback, and audit logs are scoped to this authenticated user through Prisma relations.",
+      "Your metrics, reports, feedback, and audit history are separated from every other account.",
     sessions: "Sessions",
     snapshots: "Metric snapshots",
     reports: "Reports",
@@ -56,9 +57,10 @@ const copy = {
     emptyReports: "No reports yet. Generate an AI report from the dashboard to populate this panel.",
     loading: "Loading user workspace...",
     disclaimer:
-      "NEUROSHADOW uses simulated data and does not provide medical diagnosis, treatment, or health recommendations.",
+      "NeuroShadow uses simulated data and does not provide medical diagnosis, treatment, or health recommendations.",
   },
   fa: {
+    brandName: "نورو شَدو",
     title: "پنل کاربری",
     subtitle: "داده‌های اختصاصی فضای کاری پژوهشگر واردشده.",
     language: "English",
@@ -69,7 +71,7 @@ const copy = {
     joined: "تاریخ عضویت",
     privacy: "جداسازی داده",
     privacyText:
-      "متریک‌ها، گزارش‌ها، بازخوردها و لاگ‌های حسابرسی با relationهای Prisma به همین کاربر احراز هویت‌شده وصل می‌شوند.",
+      "متریک‌ها، گزارش‌ها، بازخوردها و تاریخچه حساب شما از حساب‌های دیگر جدا نگه داشته می‌شوند.",
     sessions: "نشست‌ها",
     snapshots: "نمونه‌های متریک",
     reports: "گزارش‌ها",
@@ -84,7 +86,7 @@ const copy = {
     emptyReports: "هنوز گزارشی وجود ندارد. از داشبورد گزارش هوش مصنوعی تولید کنید تا این پنل پر شود.",
     loading: "در حال بارگذاری فضای کاربری...",
     disclaimer:
-      "NEUROSHADOW از داده‌های شبیه‌سازی‌شده استفاده می‌کند و تشخیص پزشکی، درمان یا توصیه سلامت ارائه نمی‌دهد.",
+      "نورو شَدو از داده‌های شبیه‌سازی‌شده استفاده می‌کند و تشخیص پزشکی، درمان یا توصیه سلامت ارائه نمی‌دهد.",
   },
 } as const;
 
@@ -142,7 +144,7 @@ export function AccountPanel({ initialUser }: { initialUser: DashboardUser }) {
     <main className={`account-shell dir-${direction}`} dir={direction} lang={language}>
       <section className="account-hero">
         <div>
-          <p className="eyebrow">NEUROSHADOW</p>
+          <p className="eyebrow">{text.brandName}</p>
           <h1>{text.title}</h1>
           <p>{text.subtitle}</p>
         </div>

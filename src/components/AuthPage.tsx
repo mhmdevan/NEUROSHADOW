@@ -9,7 +9,9 @@ type AuthMode = "login" | "register";
 
 const text = {
   en: {
-    loginTitle: "Login to NEUROSHADOW",
+    brandName: "NeuroShadow",
+    brandKicker: "AI Cognitive System",
+    loginTitle: "Login to NeuroShadow",
     registerTitle: "Create your research account",
     subtitle: "A real multi-user workspace for private simulated sessions, reports, and feedback history.",
     name: "Full name",
@@ -24,13 +26,15 @@ const text = {
     loginLink: "Login",
     language: "فارسی",
     disclaimer:
-      "NEUROSHADOW is an educational and research demonstration. It uses simulated data and does not provide medical diagnosis, treatment, or health recommendations.",
+      "NeuroShadow is an educational and research demonstration. It uses simulated data and does not provide medical diagnosis, treatment, or health recommendations.",
     secure: "HttpOnly session cookie • password hashing • user-scoped data",
     panel: "User-scoped dashboard",
     errorFallback: "Authentication failed. Please try again.",
   },
   fa: {
-    loginTitle: "ورود به NEUROSHADOW",
+    brandName: "نورو شَدو",
+    brandKicker: "سامانه شناختی هوش مصنوعی",
+    loginTitle: "ورود به نورو شَدو",
     registerTitle: "ساخت حساب پژوهشی",
     subtitle: "یک فضای کاری چندکاربره واقعی برای نشست‌ها، گزارش‌ها و بازخوردهای شبیه‌سازی‌شده هر کاربر.",
     name: "نام کامل",
@@ -45,7 +49,7 @@ const text = {
     loginLink: "ورود",
     language: "English",
     disclaimer:
-      "NEUROSHADOW یک نمونه آموزشی و پژوهشی است. این سامانه از داده‌های شبیه‌سازی‌شده استفاده می‌کند و تشخیص پزشکی، درمان یا توصیه سلامت ارائه نمی‌دهد.",
+      "نورو شَدو یک نمونه آموزشی و پژوهشی است. این سامانه از داده‌های شبیه‌سازی‌شده استفاده می‌کند و تشخیص پزشکی، درمان یا توصیه سلامت ارائه نمی‌دهد.",
     secure: "کوکی HttpOnly • هش رمز عبور • داده جدا برای هر کاربر",
     panel: "داشبورد اختصاصی کاربر",
     errorFallback: "احراز هویت ناموفق بود. دوباره تلاش کنید.",
@@ -113,8 +117,8 @@ export function AuthPage({ mode }: AuthPageProps) {
           <div className="auth-card__mark">
             <BrainCircuit size={34} />
           </div>
-          <p className="eyebrow">NEUROSHADOW</p>
-          <h1>{title}</h1>
+          <p className="brand-kicker">{copy.brandKicker}</p>
+          <h1 className="brand-display">{copy.brandName}</h1>
           <p>{copy.subtitle}</p>
           <div className="auth-card__secure">
             <ShieldCheck size={18} />
@@ -130,6 +134,8 @@ export function AuthPage({ mode }: AuthPageProps) {
               {copy.language}
             </button>
           </div>
+
+          <h2 className="auth-form__title">{title}</h2>
 
           {errors.form ? <div className="auth-error">{errors.form}</div> : null}
 

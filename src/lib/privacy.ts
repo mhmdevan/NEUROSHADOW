@@ -7,8 +7,8 @@ export type SensorPrivacySettings = {
 
 export const defaultSensorPrivacySettings: SensorPrivacySettings = {
   mouse: true,
-  eye: false,
-  voice: false,
+  eye: true,
+  voice: true,
   cognitive: true,
 };
 

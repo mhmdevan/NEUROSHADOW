@@ -21,6 +21,6 @@ describe("generateReport", () => {
     expect(report.keyIndicators).toHaveLength(7);
     expect(report.recommendation).toContain("Recommended non-medical action");
     expect(report.disclaimer).toBe(projectDisclaimer);
-    expect(report.content).toContain("NEUROSHADOW AI REPORT");
+    expect(report.content).toContain("NeuroShadow AI REPORT");
   });
 });

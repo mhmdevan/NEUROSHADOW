@@ -3,7 +3,7 @@ import "./globals.css";
 import "@/styles/dashboard.css";
 
 export const metadata: Metadata = {
-  title: "NEUROSHADOW | AI Cognitive Collapse Prediction Dashboard",
+  title: "NeuroShadow | AI Cognitive Collapse Prediction Dashboard",
   description:
     "Educational research dashboard using simulated cognitive indicators. Not a medical diagnosis system.",
 };

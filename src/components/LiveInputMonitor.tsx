@@ -667,8 +667,11 @@ export function LiveInputMonitor({ metrics, sessionId, privacySettings }: LiveIn
         : voiceMicState === "unsupported"
           ? t.liveInput.microphoneUnsupported
           : voiceMicState === "error"
-            ? t.liveInput.microphoneError
+          ? t.liveInput.microphoneError
             : t.liveInput.microphoneInactive;
+
+  const needsEyePermission = privacySettings.eye && eyeCameraState !== "active";
+  const needsVoicePermission = privacySettings.voice && voiceMicState !== "active";
 
   return (
     <section className="panel live-input-panel" id="live-monitor" data-nav-section aria-labelledby="live-monitor-title">
@@ -679,6 +682,37 @@ export function LiveInputMonitor({ metrics, sessionId, privacySettings }: LiveIn
         </div>
         <span className="panel__badge">{t.liveInput.badge}</span>
       </div>
+      {needsEyePermission || needsVoicePermission ? (
+        <div className="sensor-permission-panel">
+          <div>
+            <p className="eyebrow">{t.liveInput.permissionEyebrow}</p>
+            <h3>{t.liveInput.permissionTitle}</h3>
+            <p>{t.liveInput.permissionBody}</p>
+          </div>
+          <div className="sensor-permission-actions">
+            {privacySettings.eye ? (
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={eyeCameraState === "active" ? stopEyeAnalysis : startEyeAnalysis}
+              >
+                <Camera size={18} />
+                {eyeCameraState === "active" ? t.liveInput.stopEye : t.liveInput.startEye}
+              </button>
+            ) : null}
+            {privacySettings.voice ? (
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={voiceMicState === "active" ? stopVoiceAnalysis : startVoiceAnalysis}
+              >
+                <Mic2 size={18} />
+                {voiceMicState === "active" ? t.liveInput.stopVoice : t.liveInput.startVoice}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       <div className="live-input-grid">
         {signals.map((signal, index) => {
           const Icon = signalIcons[index];
