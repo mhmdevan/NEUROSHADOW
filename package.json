@@ -10,7 +10,9 @@
     "lint": "eslint . --max-warnings=0",
     "test": "vitest run",
     "prisma:generate": "prisma generate",
+    "prisma:generate:postgres": "prisma generate --schema prisma/schema.postgres.prisma",
     "prisma:migrate": "RUST_BACKTRACE=full RUST_LOG=debug prisma migrate dev",
+    "prisma:migrate:postgres": "prisma migrate deploy --schema prisma/schema.postgres.prisma",
     "prisma:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts"
   },

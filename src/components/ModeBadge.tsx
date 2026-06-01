@@ -2,6 +2,7 @@
 
 import { Database, FlaskConical } from "lucide-react";
 import { motion } from "framer-motion";
+import { useLanguage } from "./LanguageProvider";
 
 type ModeBadgeProps = {
   mode: "connected" | "mock";
@@ -10,6 +11,7 @@ type ModeBadgeProps = {
 export function ModeBadge({ mode }: ModeBadgeProps) {
   const isDatabase = mode === "connected";
   const Icon = isDatabase ? Database : FlaskConical;
+  const { t } = useLanguage();
 
   return (
     <motion.span
@@ -19,7 +21,7 @@ export function ModeBadge({ mode }: ModeBadgeProps) {
       transition={{ duration: 0.28 }}
     >
       <Icon size={16} />
-      {isDatabase ? "Database mode active" : "Demo mode active"}
+      {isDatabase ? t.mode.database : t.mode.demo}
     </motion.span>
   );
 }

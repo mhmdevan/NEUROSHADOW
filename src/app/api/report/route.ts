@@ -1,12 +1,20 @@
 import { generateMetrics } from "@/lib/mockData";
-import { generateReport } from "@/lib/reportGenerator";
+import { generateLocalizedReport } from "@/lib/reportGenerator";
 import { ensureSession, getPrismaOrNull } from "@/lib/prisma";
+import { enforceMutationSecurity } from "@/lib/requestGuards";
 import { safeJson } from "@/lib/security";
 import { isMetricsPayload } from "@/lib/validation";
+import { getCurrentUser, getUserSessionId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const guard = enforceMutationSecurity(request, {
+    route: "/api/report",
+    rateLimit: { key: "report", limit: 30, windowMs: 10 * 60 * 1000 },
+  });
+  if (guard) return guard;
+
   let body: unknown = {};
 
   try {
@@ -15,15 +23,17 @@ export async function POST(request: Request) {
     body = {};
   }
 
-  const payload = body as { metrics?: unknown; sessionId?: string };
+  const payload = body as { metrics?: unknown; sessionId?: string; language?: string };
   const metrics = isMetricsPayload(payload.metrics) ? payload.metrics : generateMetrics();
-  const sessionId = payload.sessionId || "demo-session";
-  const report = generateReport(metrics);
+  const user = await getCurrentUser();
+  const sessionId = user ? getUserSessionId(user.id) : payload.sessionId || "demo-session";
+  const language = payload.language === "fa" ? "fa" : "en";
+  const report = generateLocalizedReport(metrics, language);
   const client = await getPrismaOrNull();
 
   if (client) {
     try {
-      await ensureSession(sessionId, "research-demo");
+      await ensureSession(sessionId, "research-demo", user?.id);
       await client.report.create({
         data: {
           sessionId,
@@ -34,6 +44,7 @@ export async function POST(request: Request) {
       });
       await client.auditLog.create({
         data: {
+          userId: user?.id,
           action: "REPORT_GENERATED",
           details: `Report generated for ${sessionId} at ${report.timestamp}`,
         },

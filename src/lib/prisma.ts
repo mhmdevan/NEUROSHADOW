@@ -51,7 +51,7 @@ export async function getDatabaseStatus(): Promise<"connected" | "mock"> {
   return client ? "connected" : "mock";
 }
 
-export async function ensureSession(sessionId: string, mode = "research-demo") {
+export async function ensureSession(sessionId: string, mode = "research-demo", userId?: string) {
   const client = await getPrismaOrNull();
   if (!client) {
     return null;
@@ -59,7 +59,7 @@ export async function ensureSession(sessionId: string, mode = "research-demo") {
 
   return client.session.upsert({
     where: { sessionId },
-    update: { mode },
-    create: { sessionId, mode },
+    update: { mode, ...(userId ? { userId } : {}) },
+    create: { sessionId, mode, ...(userId ? { userId } : {}) },
   });
 }

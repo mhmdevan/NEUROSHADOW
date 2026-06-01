@@ -1,14 +1,9 @@
 "use client";
 
 import type { CognitiveMetrics } from "@/lib/mockData";
+import { useLanguage } from "./LanguageProvider";
 
-const legend = [
-  ["Prefrontal Cortex", "High Activity", "#28e7ff"],
-  ["Parietal Lobe", "Moderate", "#8e6bff"],
-  ["Temporal Lobe", "Elevated", "#ff4fd8"],
-  ["Occipital Lobe", "Normal", "#5fffb7"],
-  ["Cerebellum", "Normal", "#ffe66d"],
-];
+const legendColors = ["#28e7ff", "#8e6bff", "#ff4fd8", "#5fffb7", "#ffe66d"];
 
 type CognitiveBrainMapProps = {
   metrics: CognitiveMetrics;
@@ -16,20 +11,21 @@ type CognitiveBrainMapProps = {
 };
 
 export function CognitiveBrainMap({ metrics, reducedMotion }: CognitiveBrainMapProps) {
+  const { t } = useLanguage();
   const pulseOpacity = Math.max(0.35, metrics.collapseRisk / 80);
 
   return (
     <section className="panel brain-panel" aria-labelledby="brain-title">
       <div className="panel__header">
         <div>
-          <p className="eyebrow">Cognitive brain map</p>
-          <h2 id="brain-title">Neural Activity Projection</h2>
+          <p className="eyebrow">{t.brain.eyebrow}</p>
+          <h2 id="brain-title">{t.brain.title}</h2>
         </div>
-        <span className="panel__badge">{metrics.signalQuality}% signal</span>
+        <span className="panel__badge">{metrics.signalQuality}% {t.brain.signal}</span>
       </div>
       <div className="brain-panel__content">
         <div className="brain-visual">
-          <svg viewBox="0 0 560 360" role="img" aria-label="Stylized brain map with glowing cognitive regions">
+          <svg viewBox="0 0 560 360" role="img" aria-label={t.brain.aria}>
             <defs>
               <linearGradient id="brain-fill" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#12305a" />
@@ -98,17 +94,17 @@ export function CognitiveBrainMap({ metrics, reducedMotion }: CognitiveBrainMapP
           </svg>
         </div>
         <div className="brain-panel__legend">
-          {legend.map(([region, state, color]) => (
+          {t.brain.legend.map(([region, state], index) => (
             <div key={region}>
-              <i style={{ background: color }} />
+              <i style={{ background: legendColors[index] }} />
               <span>{region}</span>
               <strong>{state}</strong>
             </div>
           ))}
           <div className="activity-scale">
-            <span>Low Activity</span>
+            <span>{t.brain.low}</span>
             <b />
-            <span>High Activity</span>
+            <span>{t.brain.high}</span>
           </div>
         </div>
       </div>

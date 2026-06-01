@@ -11,6 +11,7 @@ import {
   Server,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { useLanguage } from "./LanguageProvider";
 
 type QuickActionsProps = {
   baselineRunning: boolean;
@@ -37,38 +38,39 @@ export function QuickActions({
   onGuide,
   onFeedback,
 }: QuickActionsProps) {
+  const { t } = useLanguage();
   const actions = [
     {
-      label: baselineRunning ? "Scanning..." : "Start Baseline Scan",
+      label: baselineRunning ? t.quickActions.scanning : t.quickActions.startBaseline,
       icon: FlaskConical,
       onClick: onBaseline,
       disabled: baselineRunning,
     },
     {
-      label: monitoringActive ? "Pause Live Monitoring" : "Resume Live Monitoring",
+      label: monitoringActive ? t.quickActions.pauseMonitoring : t.quickActions.resumeMonitoring,
       icon: monitoringActive ? Radio : PlayCircle,
       onClick: onToggleMonitoring,
     },
     {
-      label: reportLoading ? "Generating..." : "Generate AI Report",
+      label: reportLoading ? t.quickActions.generating : t.quickActions.generateReport,
       icon: FileText,
       onClick: onReport,
       disabled: reportLoading,
     },
-    { label: "Test Backend API", icon: Server, onClick: onTestApi },
-    { label: "Presentation Mode", icon: Maximize2, onClick: onPresentation },
-    { label: "About / Guide", icon: BookOpen, onClick: onGuide },
-    { label: "Feedback", icon: MessageSquare, onClick: onFeedback },
+    { label: t.quickActions.testApi, icon: Server, onClick: onTestApi },
+    { label: t.quickActions.presentationMode, icon: Maximize2, onClick: onPresentation },
+    { label: t.quickActions.aboutGuide, icon: BookOpen, onClick: onGuide },
+    { label: t.quickActions.feedback, icon: MessageSquare, onClick: onFeedback },
   ];
 
   return (
     <section className="panel quick-actions-panel" aria-labelledby="quick-actions-title">
       <div className="panel__header">
         <div>
-          <p className="eyebrow">Quick actions</p>
-          <h2 id="quick-actions-title">Judge Demo Controls</h2>
+          <p className="eyebrow">{t.quickActions.eyebrow}</p>
+          <h2 id="quick-actions-title">{t.quickActions.title}</h2>
         </div>
-        <span className="panel__badge">all actions live</span>
+        <span className="panel__badge">{t.quickActions.badge}</span>
       </div>
       <div className="quick-actions-grid">
         {actions.map((action, index) => {

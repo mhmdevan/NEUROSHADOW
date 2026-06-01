@@ -1,3 +1,4 @@
+import { getApiErrorSummary } from "@/lib/apiMonitoring";
 import { getDatabaseStatus } from "@/lib/prisma";
 import { safeJson } from "@/lib/security";
 
@@ -11,5 +12,6 @@ export async function GET() {
     service: "NEUROSHADOW API",
     timestamp: new Date().toISOString(),
     database,
+    apiErrors: getApiErrorSummary(),
   });
 }

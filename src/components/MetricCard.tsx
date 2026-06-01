@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from "react";
 import clsx from "clsx";
 import { motion, useSpring, useTransform } from "framer-motion";
+import { useLanguage } from "./LanguageProvider";
 
 type MetricCardProps = {
   icon: ReactNode;
@@ -14,6 +15,7 @@ type MetricCardProps = {
 };
 
 export function MetricCard({ icon, title, value, status, tone, points }: MetricCardProps) {
+  const { t } = useLanguage();
   const springValue = useSpring(value, { stiffness: 110, damping: 18, mass: 0.55 });
   const roundedValue = useTransform(springValue, (latest) => Math.round(latest));
   useEffect(() => {
@@ -48,7 +50,7 @@ export function MetricCard({ icon, title, value, status, tone, points }: MetricC
           <span>%</span>
         </div>
       </div>
-      <svg className="metric-card__sparkline" viewBox="0 0 110 48" role="img" aria-label={`${title} trend`}>
+      <svg className="metric-card__sparkline" viewBox="0 0 110 48" role="img" aria-label={`${title} ${t.metrics.trend}`}>
         <defs>
           <linearGradient id={`spark-${title.replace(/\s+/g, "-")}`} x1="0%" x2="100%">
             <stop offset="0%" stopColor="currentColor" stopOpacity="0.15" />

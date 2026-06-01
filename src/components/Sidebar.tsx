@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { motion } from "framer-motion";
+import { useLanguage } from "./LanguageProvider";
 
 const items = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -39,6 +40,8 @@ type SidebarProps = {
 };
 
 export function Sidebar({ activeSection, onNavigate, secureToken, databaseMode }: SidebarProps) {
+  const { direction, t } = useLanguage();
+
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -47,11 +50,11 @@ export function Sidebar({ activeSection, onNavigate, secureToken, databaseMode }
         </div>
         <div>
           <strong>NEUROSHADOW</strong>
-          <span>AI Cognitive Monitor</span>
+          <span>{t.app.monitor}</span>
         </div>
       </div>
 
-      <nav className="sidebar__nav" aria-label="Dashboard navigation">
+      <nav className="sidebar__nav" aria-label={t.sidebar.navigationLabel}>
         {items.map((item) => {
           const Icon = item.icon;
           return (
@@ -60,11 +63,11 @@ export function Sidebar({ activeSection, onNavigate, secureToken, databaseMode }
               key={item.id}
               type="button"
               onClick={() => onNavigate(item.id)}
-              whileHover={{ x: 3 }}
+              whileHover={{ x: direction === "rtl" ? -3 : 3 }}
               whileTap={{ scale: 0.98 }}
             >
               <Icon size={18} />
-              <span>{item.label}</span>
+              <span>{t.sidebar.items[item.id as keyof typeof t.sidebar.items]}</span>
             </motion.button>
           );
         })}
@@ -73,16 +76,16 @@ export function Sidebar({ activeSection, onNavigate, secureToken, databaseMode }
       <div className="sidebar__status-card">
         <div>
           <span className="status-dot" />
-          <strong>System Status</strong>
+          <strong>{t.sidebar.systemStatus}</strong>
         </div>
-        <p>{databaseMode === "connected" ? "Database mode active" : "Demo mode active"}</p>
-        <small>Secure demo session active</small>
+        <p>{databaseMode === "connected" ? t.sidebar.databaseMode : t.sidebar.demoMode}</p>
+        <small>{t.sidebar.secureSession}</small>
       </div>
 
       <div className="sidebar__footer">
         <span>
           <BarChart3 size={16} />
-          v1.7 Neural Lab
+          {t.sidebar.version}
         </span>
         <span>
           <KeyRound size={16} />

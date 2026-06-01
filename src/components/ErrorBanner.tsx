@@ -2,6 +2,7 @@
 
 import { AlertTriangle, WifiOff } from "lucide-react";
 import { motion } from "framer-motion";
+import { useLanguage } from "./LanguageProvider";
 
 type ErrorBannerProps = {
   message: string | null;
@@ -9,6 +10,8 @@ type ErrorBannerProps = {
 };
 
 export function ErrorBanner({ message, databaseMode }: ErrorBannerProps) {
+  const { t } = useLanguage();
+
   if (!message && databaseMode === "connected") {
     return null;
   }
@@ -24,9 +27,9 @@ export function ErrorBanner({ message, databaseMode }: ErrorBannerProps) {
       {message ? <WifiOff size={18} /> : <AlertTriangle size={18} />}
       <span>
         {databaseMode === "mock"
-          ? "Demo mode active: using simulated cognitive data."
-          : "Database mode active."}{" "}
-        {message ? `Backend notice: ${message}` : ""}
+          ? t.mode.demoFull
+          : t.mode.databaseFull}{" "}
+        {message ? `${t.mode.backendNotice}: ${message}` : ""}
       </span>
     </motion.section>
   );

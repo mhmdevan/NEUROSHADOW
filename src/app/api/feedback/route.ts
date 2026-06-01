@@ -1,10 +1,18 @@
 import { getPrismaOrNull } from "@/lib/prisma";
+import { enforceMutationSecurity } from "@/lib/requestGuards";
 import { safeJson } from "@/lib/security";
 import { validateFeedback } from "@/lib/validation";
+import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const guard = enforceMutationSecurity(request, {
+    route: "/api/feedback",
+    rateLimit: { key: "feedback", limit: 10, windowMs: 10 * 60 * 1000 },
+  });
+  if (guard) return guard;
+
   let body: unknown;
 
   try {
@@ -13,18 +21,21 @@ export async function POST(request: Request) {
     return safeJson({ ok: false, error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const result = validateFeedback((body ?? {}) as Record<string, unknown>);
+  const payload = (body ?? {}) as Record<string, unknown>;
+  const language = payload.language === "fa" ? "fa" : "en";
+  const result = validateFeedback(payload, language);
   if (!result.valid) {
     return safeJson({ ok: false, errors: result.errors }, { status: 400 });
   }
 
-  // Production note: attach IP/user-aware rate limiting here before accepting public traffic.
   const client = await getPrismaOrNull();
+  const user = await getCurrentUser();
   if (client) {
     try {
-      await client.feedback.create({ data: result.data });
+      await client.feedback.create({ data: { ...result.data, userId: user?.id } });
       await client.auditLog.create({
         data: {
+          userId: user?.id,
           action: "FEEDBACK_RECEIVED",
           details: `Feedback received from ${result.data.email}`,
         },
@@ -38,7 +49,11 @@ export async function POST(request: Request) {
     ok: true,
     mode: client ? "database" : "mock",
     message: client
-      ? "Feedback accepted and stored."
-      : "Feedback accepted in demo mode. No database write was performed.",
+      ? language === "fa"
+        ? "بازخورد پذیرفته و ذخیره شد."
+        : "Feedback accepted and stored."
+      : language === "fa"
+        ? "بازخورد در حالت دمو پذیرفته شد. نوشتن در دیتابیس انجام نشد."
+        : "Feedback accepted in demo mode. No database write was performed.",
   });
 }

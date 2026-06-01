@@ -1,6 +1,7 @@
 "use client";
 
 import type { CognitiveMetrics } from "@/lib/mockData";
+import { useLanguage } from "./LanguageProvider";
 
 type TimelineMetric = {
   key: keyof Pick<
@@ -37,17 +38,27 @@ type CognitiveTimelineProps = {
 };
 
 export function CognitiveTimeline({ history }: CognitiveTimelineProps) {
+  const { t } = useLanguage();
+  const labels: Record<TimelineMetric["key"], string> = {
+    focus: t.metrics.focus,
+    cognitiveLoad: t.metrics.cognitiveLoad,
+    fatigue: t.metrics.fatigue,
+    stress: t.metrics.stress,
+    stability: t.metrics.stability,
+    collapseRisk: t.metrics.collapseRisk,
+  };
+
   return (
     <section className="panel timeline-panel" aria-labelledby="timeline-title">
       <div className="panel__header">
         <div>
-          <p className="eyebrow">Cognitive timeline</p>
-          <h2 id="timeline-title">Live Indicator Trends</h2>
+          <p className="eyebrow">{t.timeline.eyebrow}</p>
+          <h2 id="timeline-title">{t.timeline.title}</h2>
         </div>
-        <span className="panel__badge">Last 10 Minutes</span>
+        <span className="panel__badge">{t.timeline.badge}</span>
       </div>
       <div className="timeline-panel__chart">
-        <svg viewBox="0 0 720 230" preserveAspectRatio="none" role="img" aria-label="Cognitive metric timeline">
+        <svg viewBox="0 0 720 230" preserveAspectRatio="none" role="img" aria-label={t.timeline.aria}>
           {[25, 50, 75].map((line) => (
             <line
               key={line}
@@ -75,7 +86,7 @@ export function CognitiveTimeline({ history }: CognitiveTimelineProps) {
         {lines.map((line) => (
           <span key={line.key}>
             <i style={{ background: line.color }} />
-            {line.label}
+            {labels[line.key]}
           </span>
         ))}
       </div>

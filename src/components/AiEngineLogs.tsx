@@ -2,22 +2,24 @@
 
 import type { EngineLog } from "@/lib/mockData";
 import { AnimatePresence, motion } from "framer-motion";
+import { useLanguage } from "./LanguageProvider";
 
 type AiEngineLogsProps = {
   logs: EngineLog[];
 };
 
 export function AiEngineLogs({ logs }: AiEngineLogsProps) {
+  const { locale, t } = useLanguage();
   const visibleLogs = logs.slice(-8);
 
   return (
     <section className="panel logs-panel" aria-labelledby="logs-title">
       <div className="panel__header">
         <div>
-          <p className="eyebrow">AI engine logs</p>
-          <h2 id="logs-title">Inference Stream</h2>
+          <p className="eyebrow">{t.logs.eyebrow}</p>
+          <h2 id="logs-title">{t.logs.title}</h2>
         </div>
-        <span className="panel__badge">Live internal analysis stream</span>
+        <span className="panel__badge">{t.logs.badge}</span>
       </div>
       <div className="logs-panel__terminal">
         <AnimatePresence initial={false}>
@@ -30,9 +32,9 @@ export function AiEngineLogs({ logs }: AiEngineLogsProps) {
               exit={{ opacity: 0, x: 12 }}
               transition={{ duration: 0.2 }}
             >
-              <span>{new Date(log.timestamp).toLocaleTimeString()}</span>
+              <span>{new Date(log.timestamp).toLocaleTimeString(locale)}</span>
               <code>[{log.level}]</code>
-              <p>{log.message}</p>
+              <p>{t.logs.messages[log.message as keyof typeof t.logs.messages] ?? log.message}</p>
             </motion.div>
           ))}
         </AnimatePresence>

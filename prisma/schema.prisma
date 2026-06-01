@@ -11,13 +11,57 @@ datasource db {
 }
 
 model Session {
-  id          String           @id @default(cuid())
-  sessionId   String           @unique
-  mode        String
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  snapshots   MetricSnapshot[]
-  reports     Report[]
+  id           String                @id @default(cuid())
+  sessionId    String                @unique
+  mode         String
+  userId       String?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  user         User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snapshots    MetricSnapshot[]
+  reports      Report[]
+  mouseSignals MouseSignalSnapshot[]
+  eyeSignals   EyeSignalSnapshot[]
+  voiceSignals VoiceSignalSnapshot[]
+  reviews      SessionReview[]
+  baselines    BaselineProfile[]
+  actions      RecommendedAction[]
+
+  @@index([userId])
+}
+
+model User {
+  id           String                @id @default(cuid())
+  name         String
+  email        String                @unique
+  passwordHash String
+  role         String                @default("researcher")
+  locale       String                @default("en")
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  authSessions AuthSession[]
+  sessions     Session[]
+  feedback     Feedback[]
+  auditLogs    AuditLog[]
+  mouseSignals MouseSignalSnapshot[]
+  eyeSignals   EyeSignalSnapshot[]
+  voiceSignals VoiceSignalSnapshot[]
+  reviews      SessionReview[]
+  baselines    BaselineProfile[]
+  actions      RecommendedAction[]
+}
+
+model AuthSession {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  userId     String
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+  lastSeenAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model MetricSnapshot {
@@ -44,6 +88,74 @@ model Alert {
   createdAt   DateTime @default(now())
 }
 
+model MouseSignalSnapshot {
+  id               String   @id @default(cuid())
+  userId           String?
+  sessionId        String?
+  actionsPerMinute Int
+  distancePx       Int
+  averageVelocity  Float
+  idleMs           Int
+  jitterScore      Int
+  directionChanges Int
+  stabilityScore   Int
+  confidence       Int
+  sampleCount      Int
+  clickCount       Int
+  wheelCount       Int
+  createdAt        DateTime @default(now())
+  user             User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session          Session? @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionId])
+}
+
+model EyeSignalSnapshot {
+  id               String   @id @default(cuid())
+  userId           String?
+  sessionId        String?
+  trackingQuality  Int
+  gazeStability    Int
+  blinkProxy       Int
+  lightingQuality  Int
+  motionVariance   Int
+  focusConsistency Int
+  confidence       Int
+  frameCount       Int
+  averageLuminance Int
+  contrastLevel    Int
+  createdAt        DateTime @default(now())
+  user             User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session          Session? @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionId])
+}
+
+model VoiceSignalSnapshot {
+  id               String   @id @default(cuid())
+  userId           String?
+  sessionId        String?
+  volumeLevel      Int
+  voiceStability   Int
+  speechActivity   Int
+  silenceRatio     Int
+  clarityScore     Int
+  noiseLevel       Int
+  toneVariability  Int
+  confidence       Int
+  sampleCount      Int
+  averageRms       Int
+  spectralCentroid Int
+  createdAt        DateTime @default(now())
+  user             User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session          Session? @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionId])
+}
+
 model Report {
   id        String   @id @default(cuid())
   sessionId String
@@ -56,18 +168,95 @@ model Report {
   @@index([sessionId])
 }
 
+model SessionReview {
+  id              String   @id @default(cuid())
+  userId          String?
+  sessionId       String
+  summary         String
+  strongestSignal String
+  bestWindow      String?
+  weakestWindow   String?
+  actionSuggested String?
+  signalQuality   Int
+  statusLabel     String
+  createdAt       DateTime @default(now())
+  user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session         Session? @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionId])
+}
+
+model BaselineProfile {
+  id                    String   @id @default(cuid())
+  userId                String?
+  sessionId             String?
+  focusSelfReport       Int
+  energySelfReport      Int
+  taskDifficulty        Int
+  distractionLevel      Int
+  focusBaseline         Int
+  stabilityBaseline     Int
+  cognitiveLoadBaseline Int
+  stressBaseline        Int
+  fatigueBaseline       Int
+  collapseRiskBaseline  Int
+  mouseStability        Int?
+  eyeQuality            Int?
+  voiceStability        Int?
+  signalQuality         Int
+  qualityScore          Int
+  statusLabel           String
+  summary               String
+  createdAt             DateTime @default(now())
+  user                  User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session               Session? @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionId])
+}
+
+model RecommendedAction {
+  id          String    @id @default(cuid())
+  userId      String?
+  sessionId   String?
+  actionType  String
+  title       String
+  reason      String
+  status      String    @default("suggested")
+  helpful     Boolean?
+  focusAfter  Int?
+  energyAfter Int?
+  followUpAt  DateTime?
+  createdAt   DateTime  @default(now())
+  respondedAt DateTime?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session     Session?  @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionId])
+}
+
 model Feedback {
   id        String   @id @default(cuid())
+  userId    String?
   name      String
   email     String
   message   String
   rating    Int
   createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
 }
 
 model AuditLog {
   id        String   @id @default(cuid())
+  userId    String?
   action    String
   details   String
   createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
 }

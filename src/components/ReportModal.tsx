@@ -2,6 +2,7 @@
 
 import { Download, X } from "lucide-react";
 import type { GeneratedReport } from "@/lib/reportGenerator";
+import { useLanguage } from "./LanguageProvider";
 
 type ReportModalProps = {
   report: GeneratedReport | null;
@@ -11,6 +12,8 @@ type ReportModalProps = {
 };
 
 export function ReportModal({ report, isOpen, sessionId, onClose }: ReportModalProps) {
+  const { direction, locale, t } = useLanguage();
+
   if (!isOpen || !report) {
     return null;
   }
@@ -30,42 +33,50 @@ export function ReportModal({ report, isOpen, sessionId, onClose }: ReportModalP
       <section className="report-modal" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
         <div className="report-modal__header">
           <div>
-            <p className="eyebrow">Generated report</p>
-            <h2 id="report-modal-title">NEUROSHADOW AI Report</h2>
-            <span className="report-modal__session">{sessionId} • {new Date(report.timestamp).toLocaleString()}</span>
+            <p className="eyebrow">{t.reportModal.eyebrow}</p>
+            <h2 id="report-modal-title">{t.reportModal.title}</h2>
+            <span className="report-modal__session">{sessionId} • {new Date(report.timestamp).toLocaleString(locale)}</span>
           </div>
-          <button className="icon-button" type="button" onClick={onClose} aria-label="Close report modal">
+          <button className="icon-button" type="button" onClick={onClose} aria-label={t.reportModal.closeAria}>
             <X size={18} />
           </button>
         </div>
         <div className="report-modal__summary-grid">
           <article>
-            <span>Risk Level</span>
-            <strong>{report.riskLevel}</strong>
+            <span>{t.reportModal.riskLevel}</span>
+            <strong>{report.riskLevel === "Low" ? t.status.low : report.riskLevel === "Moderate" ? t.status.moderate : t.status.elevated}</strong>
           </article>
           <article>
-            <span>AI Summary</span>
+            <span>{t.reportModal.aiSummary}</span>
             <p>{report.summary}</p>
           </article>
           <article>
-            <span>Recommendation</span>
+            <span>{t.reportModal.recommendation}</span>
             <p>{report.recommendation}</p>
           </article>
         </div>
         <div className="report-modal__indicators">
-          {report.keyIndicators.map((indicator) => (
-            <span key={indicator}>{indicator}</span>
-          ))}
+          {report.keyIndicators.map((indicator) => {
+            const [label, ...valueParts] = indicator.split(": ");
+            const value = valueParts.join(": ");
+
+            return (
+              <span className="report-modal__indicator" key={indicator}>
+                <small>{label}</small>
+                {value ? <bdi dir="ltr">{value}</bdi> : null}
+              </span>
+            );
+          })}
         </div>
-        <pre>{report.content}</pre>
+        <pre dir={direction}>{report.content}</pre>
         <p className="disclaimer-box">{report.disclaimer}</p>
         <div className="report-modal__actions">
           <button className="primary-button" type="button" onClick={downloadReport}>
             <Download size={18} />
-            Download .txt
+            {t.reportModal.download}
           </button>
           <button className="secondary-button" type="button" onClick={onClose}>
-            Close
+            {t.reportModal.close}
           </button>
         </div>
       </section>

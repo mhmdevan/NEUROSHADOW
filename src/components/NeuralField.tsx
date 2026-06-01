@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import type { CognitiveMetrics } from "@/lib/mockData";
+import { useLanguage } from "./LanguageProvider";
 
 type NeuralFieldProps = {
   metrics: CognitiveMetrics;
@@ -37,6 +38,7 @@ const paths = [
 ];
 
 export function NeuralField({ metrics, reducedMotion }: NeuralFieldProps) {
+  const { t } = useLanguage();
   const intensity = Math.max(0.45, Math.min(1.18, (metrics.signalQuality + metrics.focus) / 170));
   const stress = Math.max(0.25, Math.min(1, metrics.stress / 70));
   const motionClass = reducedMotion ? " neural-field--still" : "";
@@ -45,7 +47,7 @@ export function NeuralField({ metrics, reducedMotion }: NeuralFieldProps) {
     <div
       className={`neural-field${motionClass}`}
       role="img"
-      aria-label="Lightweight animated neural signal field"
+      aria-label={t.hero.neuralAria}
       style={
         {
           "--field-intensity": intensity.toFixed(2),
@@ -92,8 +94,8 @@ export function NeuralField({ metrics, reducedMotion }: NeuralFieldProps) {
       </svg>
       <div className="neural-field__scanner" aria-hidden="true" />
       <div className="neural-field__caption">
-        <span>Live neural signal field</span>
-        <strong>{metrics.signalQuality}% signal quality</strong>
+        <span>{t.hero.neuralCaption}</span>
+        <strong>{metrics.signalQuality}% {t.hero.signalQuality}</strong>
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { AlertCircle, AlertTriangle, Info } from "lucide-react";
 import clsx from "clsx";
 import type { AlertItem } from "@/lib/mockData";
 import { AnimatePresence, motion } from "framer-motion";
+import { useLanguage } from "./LanguageProvider";
 
 const alertIcon = {
   info: Info,
@@ -16,14 +17,16 @@ type AlertsPanelProps = {
 };
 
 export function AlertsPanel({ alerts }: AlertsPanelProps) {
+  const { locale, t } = useLanguage();
+
   return (
     <section className="panel alerts-panel" aria-labelledby="alerts-title">
       <div className="panel__header">
         <div>
-          <p className="eyebrow">AI alert panel</p>
-          <h2 id="alerts-title">Active Alerts</h2>
+          <p className="eyebrow">{t.alerts.eyebrow}</p>
+          <h2 id="alerts-title">{t.alerts.title}</h2>
         </div>
-        <span className="panel__badge">{alerts.length} signals</span>
+        <span className="panel__badge">{alerts.length} {t.alerts.signals}</span>
       </div>
       <div className="alerts-panel__list">
         <AnimatePresence initial={false}>
@@ -40,9 +43,9 @@ export function AlertsPanel({ alerts }: AlertsPanelProps) {
               >
                 <Icon size={18} />
                 <div>
-                  <strong>{alert.title}</strong>
-                  <p>{alert.description}</p>
-                  <time>{new Date(alert.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
+                  <strong>{t.alerts.titles[alert.title as keyof typeof t.alerts.titles] ?? alert.title}</strong>
+                  <p>{t.alerts.descriptions[alert.description as keyof typeof t.alerts.descriptions] ?? alert.description}</p>
+                  <time>{new Date(alert.time).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}</time>
                 </div>
               </motion.article>
             );
