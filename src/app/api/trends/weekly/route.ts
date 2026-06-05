@@ -40,6 +40,8 @@ export async function GET(request: Request) {
       where: {
         createdAt: { gte: windowStart, lte: now },
         session: { userId: user.id },
+        // Only real, sensor-derived snapshots feed the weekly trend (not simulated/legacy rows).
+        source: "sensors",
       },
       select: {
         focus: true,
@@ -49,6 +51,7 @@ export async function GET(request: Request) {
         stability: true,
         collapseRisk: true,
         signalQuality: true,
+        source: true,
         createdAt: true,
       },
       orderBy: { createdAt: "asc" },

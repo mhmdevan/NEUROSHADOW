@@ -29,6 +29,7 @@ export function AlertsPanel({ alerts }: AlertsPanelProps) {
         <span className="panel__badge">{alerts.length} {t.alerts.signals}</span>
       </div>
       <div className="alerts-panel__list">
+        {alerts.length === 0 ? <p className="panel-empty">{t.alerts.empty}</p> : null}
         <AnimatePresence initial={false}>
           {alerts.map((alert) => {
             const Icon = alertIcon[alert.type];

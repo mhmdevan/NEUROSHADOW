@@ -27,8 +27,10 @@ export async function POST(request: Request) {
     return safeJson({ ok: false, errors: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
 
+  // Use the captured window when present; otherwise treat the single current reading as a 1-sample window.
+  const samples = parsed.data.samples?.length ? parsed.data.samples : [parsed.data.metrics];
   const baseline = generateBaselineProfile({
-    metrics: parsed.data.metrics,
+    samples,
     focusSelfReport: parsed.data.focusSelfReport,
     energySelfReport: parsed.data.energySelfReport,
     taskDifficulty: parsed.data.taskDifficulty,
@@ -72,6 +74,13 @@ export async function POST(request: Request) {
       stressBaseline: baseline.stressBaseline,
       fatigueBaseline: baseline.fatigueBaseline,
       collapseRiskBaseline: baseline.collapseRiskBaseline,
+      focusSpread: baseline.focusSpread,
+      stabilitySpread: baseline.stabilitySpread,
+      cognitiveLoadSpread: baseline.cognitiveLoadSpread,
+      stressSpread: baseline.stressSpread,
+      fatigueSpread: baseline.fatigueSpread,
+      collapseRiskSpread: baseline.collapseRiskSpread,
+      sampleCount: baseline.sampleCount,
       ...sensorBaseline,
       signalQuality: baseline.signalQuality,
       qualityScore: baseline.qualityScore,

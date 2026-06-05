@@ -1,18 +1,39 @@
 "use client";
 
+import { useState } from "react";
 import type { CognitiveMetrics } from "@/lib/mockData";
+import { getMetricStatus } from "@/lib/metricStatus";
+import { LOW_SIGNAL_QUALITY } from "@/lib/cognitiveModel";
+import { SignalSourceBadge } from "./SignalSourceBadge";
 import { useLanguage } from "./LanguageProvider";
-
-const legendColors = ["#28e7ff", "#8e6bff", "#ff4fd8", "#5fffb7", "#ffe66d"];
 
 type CognitiveBrainMapProps = {
   metrics: CognitiveMetrics;
   reducedMotion: boolean;
 };
 
+// Each glowing region is a transparent, disclaimed *projection* of one live metric onto a
+// brain area — not an anatomical measurement. Position/color match the existing artwork and
+// the legend order in i18n (brain.legend); `metric` decides how bright/active it renders.
+const REGIONS = [
+  { key: "prefrontal", metric: "focus", cx: 190, cy: 135, r: 30, color: "#28e7ff" },
+  { key: "parietal", metric: "cognitiveLoad", cx: 306, cy: 124, r: 25, color: "#8e6bff" },
+  { key: "temporal", metric: "stress", cx: 382, cy: 194, r: 32, color: "#ff4fd8" },
+  { key: "occipital", metric: "stability", cx: 218, cy: 232, r: 24, color: "#5fffb7" },
+  { key: "cerebellum", metric: "fatigue", cx: 406, cy: 250, r: 20, color: "#ffe66d" },
+] as const satisfies ReadonlyArray<{
+  key: "prefrontal" | "parietal" | "temporal" | "occipital" | "cerebellum";
+  metric: keyof CognitiveMetrics;
+  cx: number;
+  cy: number;
+  r: number;
+  color: string;
+}>;
+
 export function CognitiveBrainMap({ metrics, reducedMotion }: CognitiveBrainMapProps) {
   const { t } = useLanguage();
-  const pulseOpacity = Math.max(0.35, metrics.collapseRisk / 80);
+  const [active, setActive] = useState<number | null>(null);
+  const lowSignal = metrics.signalQuality < LOW_SIGNAL_QUALITY;
 
   return (
     <section className="panel brain-panel" aria-labelledby="brain-title">
@@ -21,10 +42,15 @@ export function CognitiveBrainMap({ metrics, reducedMotion }: CognitiveBrainMapP
           <p className="eyebrow">{t.brain.eyebrow}</p>
           <h2 id="brain-title">{t.brain.title}</h2>
         </div>
-        <span className="panel__badge">{metrics.signalQuality}% {t.brain.signal}</span>
+        <div className="panel__header-badges">
+          <SignalSourceBadge source={metrics.source} />
+          <span className="panel__badge">
+            {metrics.signalQuality}% {t.brain.signal}
+          </span>
+        </div>
       </div>
       <div className="brain-panel__content">
-        <div className="brain-visual">
+        <div className={`brain-visual${lowSignal ? " is-low-signal" : ""}${active !== null ? " is-focusing" : ""}`}>
           <svg viewBox="0 0 560 360" role="img" aria-label={t.brain.aria}>
             <defs>
               <linearGradient id="brain-fill" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -57,50 +83,79 @@ export function CognitiveBrainMap({ metrics, reducedMotion }: CognitiveBrainMapP
             <path className="brain-fold" d="M447 128 C417 103 371 104 349 135 C324 116 297 119 282 145" />
             <path className="brain-fold" d="M461 187 C418 165 360 171 331 207 C313 190 292 190 280 210" />
             <path className="brain-fold" d="M414 248 C382 226 339 228 313 255 C300 243 288 242 278 255" />
-            <path className="brain-scanline" d="M75 176 H486" />
-            {[
-              [190, 135, 30, "#28e7ff", 0.9],
-              [306, 124, 25, "#8e6bff", 0.72],
-              [382, 194, 32, "#ff4fd8", pulseOpacity],
-              [218, 232, 24, "#5fffb7", 0.68],
-              [406, 250, 20, "#ffe66d", 0.58],
-            ].map(([cx, cy, r, color, opacity], index) => (
-              <g key={`${cx}-${cy}`} className={reducedMotion ? "" : "brain-node"}>
-                <circle
-                  cx={Number(cx)}
-                  cy={Number(cy)}
-                  r={Number(r)}
-                  fill={String(color)}
-                  opacity={Number(opacity) * 0.18}
-                  filter="url(#brain-glow)"
-                />
-                <circle cx={Number(cx)} cy={Number(cy)} r={Number(r) * 0.36} fill={String(color)} opacity={opacity} />
-                <circle
-                  className="brain-node__ring"
-                  cx={Number(cx)}
-                  cy={Number(cy)}
-                  r={Number(r) * 0.64}
-                  fill="none"
-                  stroke={String(color)}
-                  strokeWidth="2"
-                  style={{ animationDelay: `${index * 0.45}s` }}
-                />
-              </g>
-            ))}
+            {reducedMotion ? null : <path className="brain-scanline" d="M75 176 H486" />}
+            {REGIONS.map((region, index) => {
+              const value = Math.round(Number(metrics[region.metric]));
+              const activity = Math.max(0.12, Math.min(1, value / 100));
+              const haloOpacity = 0.1 + activity * 0.16;
+              const coreR = region.r * (0.3 + activity * 0.2);
+              const ringDuration = (3.6 - activity * 1.9).toFixed(2);
+              const isActive = active === index;
+              return (
+                <g
+                  key={region.key}
+                  className={`brain-region${isActive ? " is-active" : ""}`}
+                  onMouseEnter={() => setActive(index)}
+                  onMouseLeave={() => setActive(null)}
+                >
+                  <circle cx={region.cx} cy={region.cy} r={region.r} fill={region.color} opacity={haloOpacity} filter="url(#brain-glow)" />
+                  <circle cx={region.cx} cy={region.cy} r={coreR} fill={region.color} opacity={0.5 + activity * 0.4} />
+                  {reducedMotion ? null : (
+                    <circle
+                      className="brain-node__ring"
+                      cx={region.cx}
+                      cy={region.cy}
+                      r={region.r * 0.64}
+                      fill="none"
+                      stroke={region.color}
+                      strokeWidth="2"
+                      style={{ animationDuration: `${ringDuration}s`, animationDelay: `${index * 0.4}s` }}
+                    />
+                  )}
+                </g>
+              );
+            })}
             <path className="brain-link" d="M190 135 C238 110 263 111 306 124" />
             <path className="brain-link" d="M306 124 C348 136 369 159 382 194" />
             <path className="brain-link" d="M218 232 C270 210 328 212 382 194" />
             <path className="brain-link" d="M382 194 C402 211 412 228 406 250" />
           </svg>
+          {lowSignal ? <p className="brain-visual__low">{t.brain.lowSignalNote}</p> : null}
         </div>
         <div className="brain-panel__legend">
-          {t.brain.legend.map(([region, state], index) => (
-            <div key={region}>
-              <i style={{ background: legendColors[index] }} />
-              <span>{region}</span>
-              <strong>{state}</strong>
-            </div>
-          ))}
+          {REGIONS.map((region, index) => {
+            const value = Math.round(Number(metrics[region.metric]));
+            const status = getMetricStatus(region.metric, value);
+            const regionName = t.brain.legend[index]?.[0] ?? region.key;
+            const metricName = t.brain.regionMetric[region.key];
+            return (
+              <button
+                type="button"
+                key={region.key}
+                className={`brain-legend-row${active === index ? " is-active" : ""}`}
+                onMouseEnter={() => setActive(index)}
+                onMouseLeave={() => setActive(null)}
+                onFocus={() => setActive(index)}
+                onBlur={() => setActive(null)}
+                aria-label={
+                  lowSignal
+                    ? `${regionName} · ${metricName} · ${t.brain.lowSignalNote}`
+                    : `${regionName} · ${metricName} ${value}% · ${t.status[status.labelKey]}`
+                }
+              >
+                <i style={{ background: region.color }} />
+                <span>{regionName}</span>
+                <small>{metricName}</small>
+                {lowSignal ? (
+                  <strong className="brain-legend-row__idle">—</strong>
+                ) : (
+                  <strong className={`tone-${status.tone}`}>
+                    {value}% · {t.status[status.labelKey]}
+                  </strong>
+                )}
+              </button>
+            );
+          })}
           <div className="activity-scale">
             <span>{t.brain.low}</span>
             <b />
@@ -108,6 +163,7 @@ export function CognitiveBrainMap({ metrics, reducedMotion }: CognitiveBrainMapP
           </div>
         </div>
       </div>
+      <p className="brain-panel__note">{lowSignal ? t.brain.lowSignalNote : t.brain.activityNote}</p>
     </section>
   );
 }

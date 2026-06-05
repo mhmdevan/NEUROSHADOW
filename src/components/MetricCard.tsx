@@ -12,9 +12,10 @@ type MetricCardProps = {
   status: string;
   tone: "good" | "moderate" | "elevated" | "risk" | "high";
   points: number[];
+  lowSignal?: boolean;
 };
 
-export function MetricCard({ icon, title, value, status, tone, points }: MetricCardProps) {
+export function MetricCard({ icon, title, value, status, tone, points, lowSignal = false }: MetricCardProps) {
   const { t } = useLanguage();
   const springValue = useSpring(value, { stiffness: 110, damping: 18, mass: 0.55 });
   const roundedValue = useTransform(springValue, (latest) => Math.round(latest));
@@ -35,13 +36,13 @@ export function MetricCard({ icon, title, value, status, tone, points }: MetricC
 
   return (
     <motion.article
-      className={clsx("metric-card", `tone-${tone}`)}
+      className={clsx("metric-card", `tone-${tone}`, lowSignal && "metric-card--low-signal")}
       whileHover={{ y: -6, scale: 1.012 }}
       transition={{ type: "spring", stiffness: 260, damping: 18 }}
     >
       <div className="metric-card__top">
         <span className="metric-card__icon">{icon}</span>
-        <span className="metric-card__status">{status}</span>
+        <span className="metric-card__status">{lowSignal ? t.metrics.lowSignal : status}</span>
       </div>
       <div>
         <p className="eyebrow">{title}</p>

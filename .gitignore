@@ -9,3 +9,4 @@ dist
 *.sqlite-journal
 coverage
 pnpm-debug.log*
+.DS_Store

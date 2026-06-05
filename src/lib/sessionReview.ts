@@ -3,12 +3,16 @@ import type { CognitiveMetrics } from "./mockData";
 import { getProjectDisclaimer } from "./reportGenerator";
 import { sanitizeText } from "./security";
 
+export type SensorKey = "mouse" | "eye" | "voice";
+
 export type SessionReviewInput = {
   metrics: CognitiveMetrics;
   history: CognitiveMetrics[];
   language?: Language;
   baselineComplete?: boolean;
   startedAt?: string;
+  // Sensors that actually contributed during the session (derived server-side).
+  activeSensors?: SensorKey[];
 };
 
 export type GeneratedSessionReview = {
@@ -19,6 +23,7 @@ export type GeneratedSessionReview = {
   actionSuggested: string;
   signalQuality: number;
   statusLabel: string;
+  activeSensors: string[];
   disclaimer: string;
   createdAt: string;
 };
@@ -50,6 +55,13 @@ const metricLabels: Record<Language, Record<MetricKey, string>> = {
 };
 
 const keys: MetricKey[] = ["focus", "cognitiveLoad", "fatigue", "stress", "stability", "collapseRisk", "signalQuality"];
+
+const sensorLabels: Record<Language, Record<SensorKey, string>> = {
+  en: { mouse: "Mouse", eye: "Eye", voice: "Voice" },
+  fa: { mouse: "ماوس", eye: "چشم", voice: "صدا" },
+};
+
+const sensorOrder: SensorKey[] = ["mouse", "eye", "voice"];
 
 function formatTime(timestamp: string | undefined, language: Language) {
   if (!timestamp) return language === "fa" ? "اکنون" : "now";
@@ -149,6 +161,9 @@ export function generateSessionReview(input: SessionReviewInput): GeneratedSessi
   const summary = isFa
     ? `این بازبینی نشست وضعیت ${statusLabel} را نشان می‌دهد. کیفیت سیگنال ${latest.signalQuality}٪ است و مهم‌ترین تغییر ثبت‌شده ${strongestSignal} بود.`
     : `This session review shows a ${statusLabel.toLowerCase()} state. Signal quality is ${latest.signalQuality}% and the strongest recorded change was ${strongestSignal}.`;
+  const activeSensors = sensorOrder
+    .filter((key) => (input.activeSensors ?? []).includes(key))
+    .map((key) => sensorLabels[language][key]);
 
   return {
     summary: sanitizeText(summary, 500),
@@ -158,6 +173,7 @@ export function generateSessionReview(input: SessionReviewInput): GeneratedSessi
     actionSuggested: sanitizeText(getAction(latest, Boolean(input.baselineComplete), language), 500),
     signalQuality: latest.signalQuality,
     statusLabel,
+    activeSensors,
     disclaimer: getProjectDisclaimer(language),
     createdAt: new Date().toISOString(),
   };

@@ -54,6 +54,18 @@ export function SessionReviewPanel({ review, loading, onGenerate }: SessionRevie
                 <strong>{review.weakestWindow}</strong>
               </span>
             </div>
+            <div className="session-review-sensors">
+              <span>{t.sessionReview.activeSensors}</span>
+              {review.activeSensors.length > 0 ? (
+                <div className="session-review-sensor-chips">
+                  {review.activeSensors.map((sensor) => (
+                    <em key={sensor}>{sensor}</em>
+                  ))}
+                </div>
+              ) : (
+                <p>{t.sessionReview.noSensors}</p>
+              )}
+            </div>
             <p className="session-review-action">{review.actionSuggested}</p>
             <p className="disclaimer-inline">{review.disclaimer}</p>
           </article>

@@ -1,16 +1,29 @@
 "use client";
 
 import { FlaskConical, Loader2, Radar, RefreshCw } from "lucide-react";
-import { getBaselineFreshness, type BaselineSelfReport, type GeneratedBaselineProfile } from "@/lib/baseline";
+import {
+  compareToBaseline,
+  getBaselineFreshness,
+  type BaselineComparison,
+  type BaselineSelfReport,
+  type GeneratedBaselineProfile,
+} from "@/lib/baseline";
 import type { CognitiveMetrics } from "@/lib/mockData";
 import { useLanguage } from "./LanguageProvider";
 import { useMemo, useState } from "react";
+
+export type BaselineCountdown = {
+  secondsLeft: number;
+  totalSeconds: number;
+  samples: number;
+};
 
 type BaselineFlowProps = {
   metrics: CognitiveMetrics;
   baseline: GeneratedBaselineProfile | null;
   loading: boolean;
   running: boolean;
+  countdown: BaselineCountdown | null;
   onRun: (selfReport: BaselineSelfReport) => void;
 };
 
@@ -21,7 +34,7 @@ const fieldKeys: Array<keyof BaselineSelfReport> = [
   "distractionLevel",
 ];
 
-export function BaselineFlow({ metrics, baseline, loading, running, onRun }: BaselineFlowProps) {
+export function BaselineFlow({ metrics, baseline, loading, running, countdown, onRun }: BaselineFlowProps) {
   const { t, language, locale } = useLanguage();
   const [selfReport, setSelfReport] = useState<BaselineSelfReport>({
     focusSelfReport: 4,
@@ -33,16 +46,8 @@ export function BaselineFlow({ metrics, baseline, loading, running, onRun }: Bas
   const baselineState =
     !baseline ? t.baseline.missing : baseline.qualityScore < 55 ? t.baseline.lowQuality : freshness;
   const comparisons = useMemo(
-    () =>
-      baseline
-        ? [
-            [t.metrics.focus, metrics.focus, baseline.focusBaseline],
-            [t.metrics.stability, metrics.stability, baseline.stabilityBaseline],
-            [t.metrics.cognitiveLoad, metrics.cognitiveLoad, baseline.cognitiveLoadBaseline],
-            [t.metrics.collapseRisk, metrics.collapseRisk, baseline.collapseRiskBaseline],
-          ]
-        : [],
-    [baseline, metrics.cognitiveLoad, metrics.collapseRisk, metrics.focus, metrics.stability, t.metrics.cognitiveLoad, t.metrics.collapseRisk, t.metrics.focus, t.metrics.stability],
+    () => (baseline ? compareToBaseline(metrics, baseline) : []),
+    [baseline, metrics],
   );
   const sensorRows = baseline
     ? [
@@ -52,9 +57,25 @@ export function BaselineFlow({ metrics, baseline, loading, running, onRun }: Bas
       ]
     : [];
 
+  const formatNumber = (value: number) => new Intl.NumberFormat(locale).format(value);
+
+  // Express the gap from baseline as a z-score ("1.4σ below your baseline") when the
+  // baseline has a usable spread, otherwise fall back to a plain percentage delta.
+  function formatDeviation(comparison: BaselineComparison) {
+    if (comparison.z !== null) {
+      return `${formatNumber(Math.abs(comparison.z))}${t.baseline.sigma} ${t.baseline.deviation[comparison.direction]}`;
+    }
+    const sign = comparison.delta >= 0 ? "+" : "";
+    return `${sign}${formatNumber(comparison.delta)}% ${t.baseline.vsBaseline}`;
+  }
+
   function updateField(key: keyof BaselineSelfReport, value: string) {
     setSelfReport((current) => ({ ...current, [key]: Number(value) }));
   }
+
+  const captureProgress = countdown
+    ? Math.round(((countdown.totalSeconds - countdown.secondsLeft) / countdown.totalSeconds) * 100)
+    : 0;
 
   return (
     <div className="baseline-flow">
@@ -81,7 +102,7 @@ export function BaselineFlow({ metrics, baseline, loading, running, onRun }: Bas
               <label className="baseline-slider" key={key}>
                 <span>
                   {t.baseline.fields[key]}
-                  <strong>{new Intl.NumberFormat(locale).format(selfReport[key])}</strong>
+                  <strong>{formatNumber(selfReport[key])}</strong>
                 </span>
                 <input
                   aria-label={t.baseline.fields[key]}
@@ -99,6 +120,24 @@ export function BaselineFlow({ metrics, baseline, loading, running, onRun }: Bas
             {running ? <Loader2 className="spin" size={18} /> : <FlaskConical size={18} />}
             {running ? t.baseline.scanning : baseline ? t.baseline.rerun : t.baseline.run}
           </button>
+
+          {countdown ? (
+            <div className="baseline-capture" role="status" aria-live="polite">
+              <div className="baseline-capture__head">
+                <span>{t.baseline.capturing}</span>
+                <strong>
+                  {formatNumber(countdown.secondsLeft)} {t.baseline.secondsLeft}
+                </strong>
+              </div>
+              <div className="baseline-capture__bar">
+                <i style={{ width: `${captureProgress}%` }} />
+              </div>
+              <span className="baseline-capture__meta">
+                {formatNumber(countdown.samples)} {t.baseline.samplesLabel}
+              </span>
+              <p className="disclaimer-inline">{t.baseline.captureHint}</p>
+            </div>
+          ) : null}
         </section>
 
         <section className="baseline-current" aria-labelledby="baseline-current-title">
@@ -121,19 +160,13 @@ export function BaselineFlow({ metrics, baseline, loading, running, onRun }: Bas
               </div>
               <p>{baseline.summary}</p>
               <div className="baseline-comparison-grid">
-                {comparisons.map(([label, current, reference]) => {
-                  const delta = Number(current) - Number(reference);
-                  return (
-                    <span key={String(label)}>
-                      {label}
-                      <strong>{Number(current)}%</strong>
-                      <em>
-                        {delta >= 0 ? "+" : ""}
-                        {delta}% {t.baseline.vsBaseline}
-                      </em>
-                    </span>
-                  );
-                })}
+                {comparisons.map((comparison) => (
+                  <span key={comparison.key}>
+                    {t.metrics[comparison.key]}
+                    <strong>{formatNumber(comparison.current)}%</strong>
+                    <em data-direction={comparison.direction}>{formatDeviation(comparison)}</em>
+                  </span>
+                ))}
               </div>
               <div className="baseline-sensor-strip" aria-label={t.baseline.sensorCapture}>
                 {sensorRows.map(([label, value]) => (

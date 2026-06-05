@@ -50,6 +50,44 @@ describe("generateWeeklyTrends", () => {
     expect(trends.empty).toBe(false);
   });
 
+  it("excludes residual simulated snapshots so the trend reflects real behavior", () => {
+    const now = new Date("2026-06-01T12:00:00.000Z");
+    const trends = generateWeeklyTrends({
+      now,
+      language: "en",
+      sessions: [],
+      actions: [],
+      snapshots: [
+        {
+          focus: 90,
+          stability: 90,
+          signalQuality: 95,
+          cognitiveLoad: 40,
+          fatigue: 20,
+          stress: 20,
+          collapseRisk: 8,
+          createdAt: "2026-05-31T10:00:00.000Z",
+          source: "sensors",
+        },
+        {
+          focus: 10,
+          stability: 10,
+          signalQuality: 10,
+          cognitiveLoad: 95,
+          fatigue: 95,
+          stress: 95,
+          collapseRisk: 95,
+          createdAt: "2026-05-31T11:00:00.000Z",
+          source: "simulated",
+        },
+      ],
+    });
+
+    // Only the real (sensor-derived) snapshot informs the averages; the simulated row is ignored.
+    expect(trends.averageFocusScore).toBe(90);
+    expect(trends.averageStabilityScore).toBe(90);
+  });
+
   it("returns an empty state when there is no weekly data", () => {
     const trends = generateWeeklyTrends({
       now: new Date("2026-06-01T12:00:00.000Z"),

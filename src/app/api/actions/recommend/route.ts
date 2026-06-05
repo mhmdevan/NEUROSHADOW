@@ -1,5 +1,6 @@
 import { getCurrentUser, getUserSessionId } from "@/lib/auth";
 import { generateRecommendedAction } from "@/lib/actionEngine";
+import { summarizeOutcomesByActionType } from "@/lib/actionFollowUp";
 import { ensureSession, getPrismaOrNull } from "@/lib/prisma";
 import { enforceMutationSecurity } from "@/lib/requestGuards";
 import { safeJson } from "@/lib/security";
@@ -71,11 +72,17 @@ export async function POST(request: Request) {
     return safeJson({ ok: false, error: "Authentication required for action recommendations." }, { status: 401 });
   }
 
-  const [baseline, mouseSignal, eyeSignal, voiceSignal] = await Promise.all([
+  const [baseline, mouseSignal, eyeSignal, voiceSignal, outcomes] = await Promise.all([
     client.baselineProfile.findFirst({ where: { userId: user.id }, orderBy: { createdAt: "desc" } }),
     client.mouseSignalSnapshot.findFirst({ where: { userId: user.id }, orderBy: { createdAt: "desc" } }),
     client.eyeSignalSnapshot.findFirst({ where: { userId: user.id }, orderBy: { createdAt: "desc" } }),
     client.voiceSignalSnapshot.findFirst({ where: { userId: user.id }, orderBy: { createdAt: "desc" } }),
+    client.recommendedAction.findMany({
+      where: { userId: user.id, respondedAt: { not: null } },
+      orderBy: { respondedAt: "desc" },
+      take: 80,
+      select: { actionType: true, title: true, status: true, helpful: true, focusAfter: true, energyAfter: true },
+    }),
   ]);
   const action = generateRecommendedAction({
     metrics: parsed.data.metrics,
@@ -86,6 +93,7 @@ export async function POST(request: Request) {
       voiceStability: voiceSignal?.voiceStability ?? null,
       noiseLevel: voiceSignal?.noiseLevel ?? null,
     },
+    outcomesByType: summarizeOutcomesByActionType(outcomes),
     language: parsed.data.language,
   });
 

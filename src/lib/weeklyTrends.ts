@@ -9,6 +9,9 @@ export type WeeklyMetricSnapshot = {
   stress: number;
   collapseRisk: number;
   createdAt: string | Date;
+  // Origin of the snapshot. "simulated" rows are excluded from the trend so the chart
+  // reflects real measured behavior. Mock/legacy rows (undefined) are kept.
+  source?: string | null;
 };
 
 export type WeeklySessionRecord = {
@@ -197,6 +200,8 @@ export function generateWeeklyTrends(input: {
   windowStart.setHours(0, 0, 0, 0);
 
   const snapshots = input.snapshots.filter((snapshot) => {
+    // Exclude residual simulated rows so the weekly trend reflects real measured behavior.
+    if (snapshot.source === "simulated") return false;
     const createdAt = toDate(snapshot.createdAt);
     return createdAt >= windowStart && createdAt <= windowEnd;
   });

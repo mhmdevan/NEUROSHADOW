@@ -2,14 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Camera, Eye, Keyboard, Mic2, MousePointer2 } from "lucide-react";
-import type { CognitiveMetrics } from "@/lib/mockData";
 import type { SensorPrivacySettings } from "@/lib/privacy";
 import {
-  analyzeEyeFrameSamples,
+  analyzeEyeVisionSamples,
+  classifyGlasses,
   emptyEyeAnalysis,
+  estimateGlassesScore,
   type EyeAnalysisSnapshot,
-  type EyeFrameSample,
+  type EyeVisionSample,
 } from "@/lib/eyeAnalysis";
+import { getFaceLandmarker, type FaceLandmarkerHandle } from "@/lib/faceLandmarkerClient";
+import { extractFaceSignals } from "@/lib/eyeVisionFrame";
 import {
   analyzeMouseSamples,
   emptyMouseAnalysis,
@@ -26,53 +29,21 @@ import { secureFetch } from "@/lib/clientSecurity";
 import { useLanguage } from "./LanguageProvider";
 
 type LiveInputMonitorProps = {
-  metrics: CognitiveMetrics;
   sessionId: string;
   privacySettings: SensorPrivacySettings;
 };
 
-type LiveSignal =
-  | {
-      kind: "synthetic";
-      title: string;
-      value: string;
-      unit: string;
-      delta: string;
-      seed: number;
-    }
-  | {
-      kind: "mouse";
-      title: string;
-      value: string;
-      unit: string;
-      delta: string;
-      points: number[];
-    }
-  | {
-      kind: "eye";
-      title: string;
-      value: string;
-      unit: string;
-      delta: string;
-      points: number[];
-    }
-  | {
-      kind: "voice";
-      title: string;
-      value: string;
-      unit: string;
-      delta: string;
-      points: number[];
-    };
+// Every live signal is real: a measured value plus its own rolling history. When the underlying
+// sensor is off there is no fabricated fallback — the value is 0 and the sparkline is flat.
+type LiveSignal = {
+  title: string;
+  value: string;
+  unit: string;
+  delta: string;
+  points: number[];
+};
 
 const signalIcons = [Keyboard, MousePointer2, Eye, Mic2];
-
-function spark(seed: number) {
-  return Array.from({ length: 12 }, (_, index) => {
-    const value = 42 + Math.sin(index * 0.9 + seed) * 20 + Math.cos(index * 0.37 + seed) * 9;
-    return Math.max(8, Math.min(88, Math.round(value)));
-  });
-}
 
 function sparkline(points: number[]) {
   return points
@@ -142,15 +113,18 @@ function captureVoiceSample(analyser: AnalyserNode, sampleRate: number): VoiceAu
   };
 }
 
-export function LiveInputMonitor({ metrics, sessionId, privacySettings }: LiveInputMonitorProps) {
+export function LiveInputMonitor({ sessionId, privacySettings }: LiveInputMonitorProps) {
   const { t } = useLanguage();
   const samplesRef = useRef<MouseSample[]>([]);
   const clickCountRef = useRef(0);
   const wheelCountRef = useRef(0);
   const lastPointerRef = useRef<MouseSample | null>(null);
+  const keystrokesRef = useRef<number[]>([]);
+  const [keyboardRate, setKeyboardRate] = useState(0);
+  const [keyboardPoints, setKeyboardPoints] = useState<number[]>(() => Array.from({ length: 12 }, () => 0));
   const lastStoredSignatureRef = useRef("");
-  const eyeSamplesRef = useRef<EyeFrameSample[]>([]);
-  const previousEyePixelsRef = useRef<Uint8ClampedArray | null>(null);
+  const eyeSamplesRef = useRef<EyeVisionSample[]>([]);
+  const eyeDetectTimestampRef = useRef(0);
   const lastStoredEyeSignatureRef = useRef("");
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -169,6 +143,8 @@ export function LiveInputMonitor({ metrics, sessionId, privacySettings }: LiveIn
   const [eyeCameraState, setEyeCameraState] = useState<
     "inactive" | "requesting" | "active" | "unsupported" | "error"
   >("inactive");
+  // Lifecycle of the on-device face-detection model (downloaded + compiled once, lazily).
+  const [eyeModelState, setEyeModelState] = useState<"idle" | "loading" | "ready" | "unavailable">("idle");
   const [voiceAnalysis, setVoiceAnalysis] = useState<VoiceAnalysisSnapshot>(emptyVoiceAnalysis);
   const [voicePoints, setVoicePoints] = useState<number[]>(() => Array.from({ length: 12 }, () => 0));
   const [voiceStorageState, setVoiceStorageState] = useState<"idle" | "stored" | "mock">("idle");
@@ -182,9 +158,12 @@ export function LiveInputMonitor({ metrics, sessionId, privacySettings }: LiveIn
       clickCountRef.current = 0;
       wheelCountRef.current = 0;
       lastPointerRef.current = null;
+      keystrokesRef.current = [];
       const resetTimer = window.setTimeout(() => {
         setMouseAnalysis(emptyMouseAnalysis);
         setMousePoints(zeroSparkPoints());
+        setKeyboardRate(0);
+        setKeyboardPoints(zeroSparkPoints());
         setStorageState("idle");
       }, 0);
       return () => window.clearTimeout(resetTimer);
@@ -210,13 +189,21 @@ export function LiveInputMonitor({ metrics, sessionId, privacySettings }: LiveIn
       wheelCountRef.current += 1;
     }
 
+    // Aggregate keystroke RATE only — timestamps of keydown events, never which keys.
+    function recordKey() {
+      const now = Date.now();
+      keystrokesRef.current = [...keystrokesRef.current, now].filter((ts) => now - ts <= 60000).slice(-600);
+    }
+
     window.addEventListener("pointermove", recordPointer, { passive: true });
     window.addEventListener("pointerdown", recordClick, { passive: true });
     window.addEventListener("wheel", recordWheel, { passive: true });
+    window.addEventListener("keydown", recordKey, { passive: true });
     return () => {
       window.removeEventListener("pointermove", recordPointer);
       window.removeEventListener("pointerdown", recordClick);
       window.removeEventListener("wheel", recordWheel);
+      window.removeEventListener("keydown", recordKey);
     };
   }, [privacySettings.mouse]);
 
@@ -226,12 +213,19 @@ export function LiveInputMonitor({ metrics, sessionId, privacySettings }: LiveIn
         setMouseAnalysis(emptyMouseAnalysis);
         return;
       }
+      const now = Date.now();
       const next = analyzeMouseSamples(samplesRef.current, {
         clickCount: clickCountRef.current,
         wheelCount: wheelCountRef.current,
       });
       setMouseAnalysis(next);
       setMousePoints((current) => [...current.slice(-11), Math.min(100, Math.round(next.actionsPerMinute / 8))]);
+
+      // Real keyboard rate: keydown events in the trailing 60s window = keys/min.
+      const recentKeys = keystrokesRef.current.filter((ts) => now - ts <= 60000);
+      keystrokesRef.current = recentKeys;
+      setKeyboardRate(recentKeys.length);
+      setKeyboardPoints((current) => [...current.slice(-11), Math.min(100, Math.round(recentKeys.length * 1.2))]);
     }, 1200);
 
     return () => window.clearInterval(timer);
@@ -272,7 +266,8 @@ export function LiveInputMonitor({ metrics, sessionId, privacySettings }: LiveIn
   const releaseEyeStream = useCallback(() => {
     mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
     mediaStreamRef.current = null;
-    previousEyePixelsRef.current = null;
+    eyeSamplesRef.current = [];
+    eyeDetectTimestampRef.current = 0;
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
@@ -309,6 +304,10 @@ export function LiveInputMonitor({ metrics, sessionId, privacySettings }: LiveIn
         await videoRef.current.play();
       }
       setEyeCameraState("active");
+      // The detection effect (triggered by "active") will load the model and flip this to
+      // "ready"/"unavailable". Setting it here (in an event handler, not synchronously in an
+      // effect) shows the loading state immediately without cascading renders.
+      setEyeModelState((state) => (state === "ready" ? state : "loading"));
     } catch {
       setEyeCameraState("error");
     }
@@ -358,6 +357,8 @@ export function LiveInputMonitor({ metrics, sessionId, privacySettings }: LiveIn
         video: false,
       });
       const audioContext = new AudioContextConstructor();
+      // Start (and keep) the context running — created inside a click handler, so this is allowed.
+      await audioContext.resume().catch(() => undefined);
       const analyser = audioContext.createAnalyser();
       analyser.fftSize = 2048;
       analyser.smoothingTimeConstant = 0.74;
@@ -380,11 +381,38 @@ export function LiveInputMonitor({ metrics, sessionId, privacySettings }: LiveIn
     }
   }, []);
 
+  // Keep analysis alive across tab switches / background work. Active camera/mic streams already
+  // exempt the tab from heavy timer throttling, but some browsers suspend the AudioContext or
+  // pause the video on blur — so we resume both whenever the tab becomes visible again.
+  useEffect(() => {
+    function handleVisibility() {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+        return;
+      }
+      const audioContext = audioContextRef.current;
+      if (audioContext && audioContext.state === "suspended") {
+        void audioContext.resume().catch(() => undefined);
+      }
+      const video = videoRef.current;
+      if (video && mediaStreamRef.current && video.paused) {
+        void video.play().catch(() => undefined);
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", handleVisibility);
+    };
+  }, []);
+
   useEffect(() => {
     if (!privacySettings.eye) {
       releaseEyeStream();
       const resetTimer = window.setTimeout(() => {
         setEyeCameraState("inactive");
+        setEyeModelState("idle");
         setEyeAnalysis(emptyEyeAnalysis);
         setEyePoints(zeroSparkPoints());
         setEyeStorageState("idle");
@@ -406,82 +434,114 @@ export function LiveInputMonitor({ metrics, sessionId, privacySettings }: LiveIn
     }
   }, [privacySettings.voice, releaseVoiceStream]);
 
+  // Real face/eye detection loop. Each tick runs the MediaPipe FaceLandmarker on the current
+  // camera frame to measure actual face presence, blink, gaze and head pose, plus an image-based
+  // glasses estimate. When no face is present, the snapshot honestly reports confidence 0 instead
+  // of inventing numbers — so stepping out of frame is reflected immediately.
   useEffect(() => {
     if (eyeCameraState !== "active" || !privacySettings.eye) {
       return;
     }
 
-    function captureEyeSample() {
+    let cancelled = false;
+    let timer = 0;
+
+    function sampleFrame(landmarker: FaceLandmarkerHandle) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
-      if (!video || !canvas || video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
-        return null;
-      }
-
-      const width = 160;
-      const height = 120;
-      canvas.width = width;
-      canvas.height = height;
-      const context = canvas.getContext("2d", { willReadFrequently: true });
-      if (!context) {
-        return null;
-      }
-
-      context.drawImage(video, 0, 0, width, height);
-      const roiX = Math.floor(width * 0.22);
-      const roiY = Math.floor(height * 0.2);
-      const roiWidth = Math.floor(width * 0.56);
-      const roiHeight = Math.floor(height * 0.3);
-      const data = context.getImageData(roiX, roiY, roiWidth, roiHeight).data;
-      const luminancePixels = new Uint8ClampedArray(data.length / 4);
-
-      let sum = 0;
-      let darkCount = 0;
-      for (let index = 0, pixelIndex = 0; index < data.length; index += 4, pixelIndex += 1) {
-        const luminance = Math.round(data[index] * 0.299 + data[index + 1] * 0.587 + data[index + 2] * 0.114);
-        luminancePixels[pixelIndex] = luminance;
-        sum += luminance;
-        if (luminance < 54) {
-          darkCount += 1;
-        }
-      }
-
-      const mean = sum / Math.max(luminancePixels.length, 1);
-      let variance = 0;
-      let motion = 0;
-      const previousPixels = previousEyePixelsRef.current;
-      for (let index = 0; index < luminancePixels.length; index += 1) {
-        variance += (luminancePixels[index] - mean) ** 2;
-        if (previousPixels && previousPixels[index] !== undefined) {
-          motion += Math.abs(luminancePixels[index] - previousPixels[index]);
-        }
-      }
-      previousEyePixelsRef.current = luminancePixels;
-
-      return {
-        timestamp: Date.now(),
-        luminance: mean,
-        contrast: Math.sqrt(variance / Math.max(luminancePixels.length, 1)),
-        motion: previousPixels ? motion / Math.max(luminancePixels.length, 1) : 0,
-        darkRatio: darkCount / Math.max(luminancePixels.length, 1),
-      } satisfies EyeFrameSample;
-    }
-
-    const timer = window.setInterval(() => {
-      const sample = captureEyeSample();
-      if (!sample) {
+      if (!video || video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
         return;
       }
-      const now = Date.now();
-      eyeSamplesRef.current = [...eyeSamplesRef.current, sample]
-        .filter((item) => now - item.timestamp <= 18000)
-        .slice(-40);
-      const next = analyzeEyeFrameSamples(eyeSamplesRef.current, now);
-      setEyeAnalysis(next);
-      setEyePoints((current) => [...current.slice(-11), next.trackingQuality]);
-    }, 700);
 
-    return () => window.clearInterval(timer);
+      // detectForVideo requires strictly-increasing timestamps.
+      let timestampMs = performance.now();
+      if (timestampMs <= eyeDetectTimestampRef.current) {
+        timestampMs = eyeDetectTimestampRef.current + 1;
+      }
+      eyeDetectTimestampRef.current = timestampMs;
+
+      const result = landmarker.detectForVideo(video, timestampMs);
+      const signals = extractFaceSignals(result);
+
+      // Glasses + lighting need pixels: crop the detected eye band and inspect it on a tiny canvas.
+      let glassesScore = 0;
+      let brightness = 0;
+      if (signals.faceDetected && signals.eyeRegion && canvas) {
+        const context = canvas.getContext("2d", { willReadFrequently: true });
+        if (context) {
+          const vw = video.videoWidth;
+          const vh = video.videoHeight;
+          const sx = signals.eyeRegion.x * vw;
+          const sy = signals.eyeRegion.y * vh;
+          const sw = Math.max(1, signals.eyeRegion.width * vw);
+          const sh = Math.max(1, signals.eyeRegion.height * vh);
+          const targetW = 96;
+          const targetH = Math.max(8, Math.round((targetW * sh) / sw));
+          canvas.width = targetW;
+          canvas.height = targetH;
+          context.drawImage(video, sx, sy, sw, sh, 0, 0, targetW, targetH);
+          const pixels = context.getImageData(0, 0, targetW, targetH).data;
+          const gray = new Uint8ClampedArray(targetW * targetH);
+          let sum = 0;
+          for (let index = 0, pixelIndex = 0; index < pixels.length; index += 4, pixelIndex += 1) {
+            const luminance = Math.round(
+              pixels[index] * 0.299 + pixels[index + 1] * 0.587 + pixels[index + 2] * 0.114,
+            );
+            gray[pixelIndex] = luminance;
+            sum += luminance;
+          }
+          brightness = sum / Math.max(gray.length, 1);
+          glassesScore = estimateGlassesScore(gray, targetW, targetH);
+        }
+      }
+
+      const now = Date.now();
+      const sample: EyeVisionSample = {
+        timestamp: now,
+        faceDetected: signals.faceDetected,
+        eyeOpenness: signals.eyeOpenness,
+        gazeX: signals.gazeX,
+        gazeY: signals.gazeY,
+        headYaw: signals.headYaw,
+        headPitch: signals.headPitch,
+        glassesScore,
+        brightness,
+      };
+      eyeSamplesRef.current = [...eyeSamplesRef.current, sample]
+        .filter((item) => now - item.timestamp <= 6000)
+        .slice(-60);
+      const next = analyzeEyeVisionSamples(eyeSamplesRef.current, now);
+      setEyeAnalysis(next);
+      setEyePoints((current) => [...current.slice(-11), next.faceDetected ? next.trackingQuality : 0]);
+    }
+
+    function loop(landmarker: FaceLandmarkerHandle) {
+      if (cancelled) return;
+      try {
+        sampleFrame(landmarker);
+      } catch {
+        // A single dropped frame shouldn't tear down the whole loop.
+      }
+      // setTimeout keeps firing while the tab is backgrounded (≈1fps) so analysis continues; the
+      // foreground runs much faster for a smooth preview.
+      const hidden = typeof document !== "undefined" && document.visibilityState !== "visible";
+      timer = window.setTimeout(() => loop(landmarker), hidden ? 1000 : 130);
+    }
+
+    getFaceLandmarker()
+      .then((landmarker) => {
+        if (cancelled) return;
+        setEyeModelState("ready");
+        loop(landmarker);
+      })
+      .catch(() => {
+        if (!cancelled) setEyeModelState("unavailable");
+      });
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [eyeCameraState, privacySettings.eye]);
 
   useEffect(() => {
@@ -573,62 +633,76 @@ export function LiveInputMonitor({ metrics, sessionId, privacySettings }: LiveIn
     return () => controller.abort();
   }, [privacySettings.voice, sessionId, voiceAnalysis]);
 
-  const signals = useMemo<LiveSignal[]>(() => [
-    {
-      kind: "synthetic",
-      title: t.liveInput.keyboard,
-      value: privacySettings.cognitive ? String(Math.round(metrics.focus * 0.74)) : "0",
-      unit: t.liveInput.keys,
-      delta: privacySettings.cognitive ? (metrics.focus > 72 ? "+4.2%" : "-2.1%") : t.privacy.disabled,
-      seed: metrics.focus / 14,
-    },
-    {
-      kind: "mouse",
-      title: t.liveInput.mouse,
-      value: privacySettings.mouse ? String(mouseAnalysis.actionsPerMinute) : "0",
-      unit: t.liveInput.actions,
-      delta: privacySettings.mouse
-        ? mouseAnalysis.confidence > 18
-          ? `${mouseAnalysis.confidence}% ${t.liveInput.confidence}`
-          : t.status.pending
-        : t.privacy.disabled,
-      points: privacySettings.mouse ? mousePoints : Array.from({ length: 12 }, () => 0),
-    },
-    {
-      kind: "eye",
-      title: t.liveInput.eye,
-      value: privacySettings.eye ? String(eyeAnalysis.frameCount > 0 ? eyeAnalysis.trackingQuality : metrics.signalQuality) : "0",
-      unit: t.liveInput.quality,
-      delta: !privacySettings.eye
-        ? t.privacy.disabled
-        : eyeCameraState === "active" && eyeAnalysis.confidence > 18
-          ? `${eyeAnalysis.confidence}% ${t.liveInput.confidence}`
-          : t.liveInput.cameraInactive,
-      points: privacySettings.eye ? (eyeAnalysis.frameCount > 0 ? eyePoints : spark(metrics.signalQuality / 9)) : Array.from({ length: 12 }, () => 0),
-    },
-    {
-      kind: "voice",
-      title: t.liveInput.voice,
-      value: privacySettings.voice ? String(voiceAnalysis.sampleCount > 0 ? voiceAnalysis.voiceStability : Math.round(metrics.stress * 0.92)) : "0",
-      unit: t.liveInput.quality,
-      delta: !privacySettings.voice
-        ? t.privacy.disabled
-        : voiceMicState === "active" && voiceAnalysis.confidence > 18
-          ? `${voiceAnalysis.confidence}% ${t.liveInput.confidence}`
-          : t.liveInput.microphoneInactive,
-      points: privacySettings.voice ? (voiceAnalysis.sampleCount > 0 ? voicePoints : spark(metrics.stress / 8)) : Array.from({ length: 12 }, () => 0),
-    },
-  ], [
+  const signals = useMemo<LiveSignal[]>(() => {
+    const flat = zeroSparkPoints();
+    const eyeLive = privacySettings.eye && eyeCameraState === "active" && eyeAnalysis.faceDetected;
+    const voiceLive = privacySettings.voice && voiceMicState === "active" && voiceAnalysis.sampleCount > 0;
+    return [
+      {
+        title: t.liveInput.keyboard,
+        value: privacySettings.mouse ? String(keyboardRate) : "0",
+        unit: t.liveInput.keys,
+        delta: privacySettings.mouse
+          ? keyboardRate > 0
+            ? t.status.monitoring
+            : t.status.pending
+          : t.privacy.disabled,
+        points: privacySettings.mouse ? keyboardPoints : flat,
+      },
+      {
+        title: t.liveInput.mouse,
+        value: privacySettings.mouse ? String(mouseAnalysis.actionsPerMinute) : "0",
+        unit: t.liveInput.actions,
+        delta: privacySettings.mouse
+          ? mouseAnalysis.confidence > 18
+            ? `${mouseAnalysis.confidence}% ${t.liveInput.confidence}`
+            : t.status.pending
+          : t.privacy.disabled,
+        points: privacySettings.mouse ? mousePoints : flat,
+      },
+      {
+        title: t.liveInput.eye,
+        value: eyeLive ? String(eyeAnalysis.trackingQuality) : "0",
+        unit: t.liveInput.quality,
+        delta: !privacySettings.eye
+          ? t.privacy.disabled
+          : eyeCameraState !== "active"
+            ? t.liveInput.cameraInactive
+            : eyeModelState === "loading"
+              ? t.liveInput.modelLoading
+              : eyeModelState === "unavailable"
+                ? t.liveInput.modelUnavailable
+                : eyeAnalysis.faceDetected
+                  ? `${eyeAnalysis.confidence}% ${t.liveInput.confidence}`
+                  : t.liveInput.faceMissing,
+        points: eyeLive ? eyePoints : flat,
+      },
+      {
+        title: t.liveInput.voice,
+        value: voiceLive ? String(voiceAnalysis.voiceStability) : "0",
+        unit: t.liveInput.quality,
+        delta: !privacySettings.voice
+          ? t.privacy.disabled
+          : voiceMicState === "active"
+            ? voiceAnalysis.confidence > 18
+              ? `${voiceAnalysis.confidence}% ${t.liveInput.confidence}`
+              : t.status.monitoring
+            : t.liveInput.microphoneInactive,
+        points: voiceLive ? voicePoints : flat,
+      },
+    ];
+  }, [
     eyeAnalysis.confidence,
-    eyeAnalysis.frameCount,
+    eyeAnalysis.faceDetected,
     eyeAnalysis.trackingQuality,
     eyeCameraState,
+    eyeModelState,
     eyePoints,
-    metrics,
+    keyboardPoints,
+    keyboardRate,
     mouseAnalysis.actionsPerMinute,
     mouseAnalysis.confidence,
     mousePoints,
-    privacySettings.cognitive,
     privacySettings.eye,
     privacySettings.mouse,
     privacySettings.voice,
@@ -640,20 +714,34 @@ export function LiveInputMonitor({ metrics, sessionId, privacySettings }: LiveIn
     voicePoints,
   ]);
 
-  const eyeStatusText =
-    !privacySettings.eye
-      ? t.privacy.disabled
-      : eyeCameraState === "active"
-      ? eyeAnalysis.confidence > 18
-        ? t.status.monitoring
-        : t.liveInput.calibrateEye
-      : eyeCameraState === "requesting"
-        ? t.liveInput.cameraPending
-        : eyeCameraState === "unsupported"
-          ? t.liveInput.cameraUnsupported
-          : eyeCameraState === "error"
-            ? t.liveInput.cameraError
-            : t.liveInput.cameraInactive;
+  const eyeStatusText = !privacySettings.eye
+    ? t.privacy.disabled
+    : eyeCameraState === "requesting"
+      ? t.liveInput.cameraPending
+      : eyeCameraState === "unsupported"
+        ? t.liveInput.cameraUnsupported
+        : eyeCameraState === "error"
+          ? t.liveInput.cameraError
+          : eyeCameraState !== "active"
+            ? t.liveInput.cameraInactive
+            : eyeModelState === "loading"
+              ? t.liveInput.modelLoading
+              : eyeModelState === "unavailable"
+                ? t.liveInput.modelUnavailable
+                : eyeAnalysis.faceDetected
+                  ? t.status.monitoring
+                  : t.liveInput.faceMissing;
+
+  // Human-readable glasses verdict for the camera overlay and the metric grid.
+  const glassesVerdict = classifyGlasses(eyeAnalysis);
+  const glassesLabel =
+    glassesVerdict === "detected"
+      ? t.liveInput.glassesYes
+      : glassesVerdict === "uncertain"
+        ? t.liveInput.glassesUncertain
+        : glassesVerdict === "none"
+          ? t.liveInput.glassesNo
+          : t.liveInput.glassesUnknown;
 
   const voiceStatusText =
     !privacySettings.voice
@@ -682,6 +770,7 @@ export function LiveInputMonitor({ metrics, sessionId, privacySettings }: LiveIn
         </div>
         <span className="panel__badge">{t.liveInput.badge}</span>
       </div>
+      <p className="live-input-hint">{t.liveInput.backgroundHint}</p>
       {needsEyePermission || needsVoicePermission ? (
         <div className="sensor-permission-panel">
           <div>
@@ -716,7 +805,7 @@ export function LiveInputMonitor({ metrics, sessionId, privacySettings }: LiveIn
       <div className="live-input-grid">
         {signals.map((signal, index) => {
           const Icon = signalIcons[index];
-          const points = signal.kind === "synthetic" ? spark(signal.seed) : signal.points;
+          const points = signal.points;
           return (
             <article className="live-input-card" key={signal.title}>
               <div className="live-input-card__top">
@@ -802,8 +891,37 @@ export function LiveInputMonitor({ metrics, sessionId, privacySettings }: LiveIn
                   : t.liveInput.startEye}
             </button>
           </div>
-          <video ref={videoRef} className="analysis-video" muted playsInline aria-hidden="true" />
-          <canvas ref={canvasRef} className="analysis-canvas" aria-hidden="true" />
+          {eyeModelState === "unavailable" && eyeCameraState === "active" ? (
+            <p className="eye-vision-error">{t.liveInput.modelUnavailable}</p>
+          ) : null}
+          <div className="eye-vision-stage">
+            <video ref={videoRef} className="eye-vision-feed" muted playsInline aria-hidden="true" />
+            {eyeCameraState === "active" ? (
+              <div
+                className={`eye-vision-overlay ${
+                  eyeModelState === "loading"
+                    ? "is-loading"
+                    : eyeAnalysis.faceDetected
+                      ? "is-detected"
+                      : "is-missing"
+                }`}
+              >
+                <span className="eye-vision-overlay__face">
+                  {eyeModelState === "loading"
+                    ? t.liveInput.modelLoading
+                    : eyeAnalysis.faceDetected
+                      ? t.liveInput.faceDetected
+                      : t.liveInput.faceMissing}
+                </span>
+                {eyeAnalysis.faceDetected ? (
+                  <span className="eye-vision-overlay__glasses">
+                    {t.liveInput.glasses}: {glassesLabel}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+            <canvas ref={canvasRef} className="analysis-canvas" aria-hidden="true" />
+          </div>
         </div>
         <div className="mouse-analysis-grid">
           <span>
@@ -829,6 +947,14 @@ export function LiveInputMonitor({ metrics, sessionId, privacySettings }: LiveIn
           <span>
             {t.liveInput.focusConsistency}
             <strong>{eyeAnalysis.focusConsistency}%</strong>
+          </span>
+          <span>
+            {t.liveInput.facePresence}
+            <strong>{eyeAnalysis.facePresence}%</strong>
+          </span>
+          <span>
+            {t.liveInput.glasses}
+            <strong>{glassesLabel}</strong>
           </span>
           <span>
             {t.liveInput.confidence}

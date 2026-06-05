@@ -15,6 +15,13 @@ function serializeBaseline(baseline: {
   stressBaseline: number;
   fatigueBaseline: number;
   collapseRiskBaseline: number;
+  focusSpread: number | null;
+  stabilitySpread: number | null;
+  cognitiveLoadSpread: number | null;
+  stressSpread: number | null;
+  fatigueSpread: number | null;
+  collapseRiskSpread: number | null;
+  sampleCount: number | null;
   mouseStability: number | null;
   eyeQuality: number | null;
   voiceStability: number | null;
@@ -35,6 +42,13 @@ function serializeBaseline(baseline: {
     stressBaseline: baseline.stressBaseline,
     fatigueBaseline: baseline.fatigueBaseline,
     collapseRiskBaseline: baseline.collapseRiskBaseline,
+    focusSpread: baseline.focusSpread,
+    stabilitySpread: baseline.stabilitySpread,
+    cognitiveLoadSpread: baseline.cognitiveLoadSpread,
+    stressSpread: baseline.stressSpread,
+    fatigueSpread: baseline.fatigueSpread,
+    collapseRiskSpread: baseline.collapseRiskSpread,
+    sampleCount: baseline.sampleCount ?? 0,
     mouseStability: baseline.mouseStability,
     eyeQuality: baseline.eyeQuality,
     voiceStability: baseline.voiceStability,

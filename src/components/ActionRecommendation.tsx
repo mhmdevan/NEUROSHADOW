@@ -54,6 +54,7 @@ export function ActionRecommendation({
               </button>
             </div>
             <p>{action.reason}</p>
+            {action.historyNote ? <p className="action-history-note">{action.historyNote}</p> : null}
             <div className="action-meta-grid">
               <span>
                 {t.actionRecommendation.followUp}

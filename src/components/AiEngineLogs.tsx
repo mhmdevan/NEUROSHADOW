@@ -1,14 +1,16 @@
 "use client";
 
-import type { EngineLog } from "@/lib/mockData";
+import type { EngineLog, MetricSource } from "@/lib/mockData";
 import { AnimatePresence, motion } from "framer-motion";
+import { SignalSourceBadge } from "./SignalSourceBadge";
 import { useLanguage } from "./LanguageProvider";
 
 type AiEngineLogsProps = {
   logs: EngineLog[];
+  source?: MetricSource;
 };
 
-export function AiEngineLogs({ logs }: AiEngineLogsProps) {
+export function AiEngineLogs({ logs, source }: AiEngineLogsProps) {
   const { locale, t } = useLanguage();
   const visibleLogs = logs.slice(-8);
 
@@ -19,9 +21,13 @@ export function AiEngineLogs({ logs }: AiEngineLogsProps) {
           <p className="eyebrow">{t.logs.eyebrow}</p>
           <h2 id="logs-title">{t.logs.title}</h2>
         </div>
-        <span className="panel__badge">{t.logs.badge}</span>
+        <div className="panel__header-badges">
+          <SignalSourceBadge source={source} />
+          <span className="panel__badge">{t.logs.badge}</span>
+        </div>
       </div>
       <div className="logs-panel__terminal">
+        {visibleLogs.length === 0 ? <p className="panel-empty">{t.logs.empty}</p> : null}
         <AnimatePresence initial={false}>
           {visibleLogs.map((log) => (
             <motion.div

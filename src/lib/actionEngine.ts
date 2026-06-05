@@ -1,3 +1,4 @@
+import type { ActionTypeOutcome } from "./actionFollowUp";
 import type { Language } from "./i18n";
 import type { CognitiveMetrics } from "./mockData";
 import { getProjectDisclaimer } from "./reportGenerator";
@@ -33,6 +34,8 @@ export type GeneratedRecommendedAction = {
   priority: "low" | "medium" | "high";
   followUpMinutes: number;
   followUpAt: string;
+  // Transparent, plain-language note when the user's own history influenced this pick.
+  historyNote: string | null;
   disclaimer: string;
   createdAt: string;
 };
@@ -42,6 +45,8 @@ export type ActionEngineInput = {
   baseline?: ActionBaseline;
   sensors?: ActionSensorContext;
   language?: Language;
+  // The user's prior helpful/not-useful history per action type (Phase 4).
+  outcomesByType?: Record<string, ActionTypeOutcome>;
 };
 
 type ActionRule = {
@@ -188,9 +193,53 @@ const fallbackCopy: Record<Language, { title: string; reason: string }> = {
   },
 };
 
+const priorityWeight: Record<GeneratedRecommendedAction["priority"], number> = {
+  high: 3,
+  medium: 2,
+  low: 1,
+};
+
+// Base priority, nudged by the user's own history with this action type. A strong helpful
+// history adds up to +1; a poor one subtracts up to -1. Priority stays dominant, so safety
+// rules are not silenced by history, but a well-liked action can win among equal matches.
+function scoreCandidate(
+  rule: { actionType: string; priority: GeneratedRecommendedAction["priority"] },
+  outcomesByType?: Record<string, ActionTypeOutcome>,
+) {
+  const base = priorityWeight[rule.priority];
+  const outcome = outcomesByType?.[rule.actionType];
+  if (!outcome || outcome.answered === 0) {
+    return base;
+  }
+  return base + (outcome.helpfulRate - 0.5) * 2;
+}
+
+function buildHistoryNote(
+  actionType: string,
+  outcomesByType: Record<string, ActionTypeOutcome> | undefined,
+  language: Language,
+) {
+  const outcome = outcomesByType?.[actionType];
+  if (!outcome || outcome.helpfulCount <= 0) {
+    return null;
+  }
+  const note =
+    language === "fa"
+      ? `متناسب با شما: این اقدام پیش از این ${outcome.helpfulCount} بار از ${outcome.answered} بار کمک کرده است.`
+      : `Adapted to you: this action helped ${outcome.helpfulCount} of ${outcome.answered} times before.`;
+  return sanitizeText(note, 200);
+}
+
 export function generateRecommendedAction(input: ActionEngineInput): GeneratedRecommendedAction {
   const language = input.language === "fa" ? "fa" : "en";
-  const matchedRule = rules.find((rule) => rule.when({ metrics: input.metrics, baseline: input.baseline ?? null, sensors: input.sensors }));
+  const context = { metrics: input.metrics, baseline: input.baseline ?? null, sensors: input.sensors };
+  const candidates = rules.filter((rule) => rule.when(context));
+  const matchedRule =
+    candidates.length > 0
+      ? candidates.reduce((best, rule) =>
+          scoreCandidate(rule, input.outcomesByType) > scoreCandidate(best, input.outcomesByType) ? rule : best,
+        )
+      : null;
   const selected = matchedRule ?? {
     actionType: "keep_current_rhythm",
     priority: "low" as const,
@@ -209,6 +258,7 @@ export function generateRecommendedAction(input: ActionEngineInput): GeneratedRe
     priority: selected.priority,
     followUpMinutes: selected.followUpMinutes,
     followUpAt: followUpAt.toISOString(),
+    historyNote: buildHistoryNote(selected.actionType, input.outcomesByType, language),
     disclaimer: getProjectDisclaimer(language),
     createdAt: now.toISOString(),
   };

@@ -44,4 +44,22 @@ describe("session review", () => {
     expect(review.actionSuggested).toContain("خط پایه");
     expect(review.disclaimer).toContain("تشخیص پزشکی");
   });
+
+  it("lists active sensors in a fixed order and the requested language", () => {
+    const en = generateSessionReview({
+      metrics: base,
+      history: [base],
+      activeSensors: ["voice", "mouse"],
+      language: "en",
+    });
+    expect(en.activeSensors).toEqual(["Mouse", "Voice"]);
+
+    const fa = generateSessionReview({ metrics: base, history: [base], activeSensors: ["eye"], language: "fa" });
+    expect(fa.activeSensors).toEqual(["چشم"]);
+  });
+
+  it("returns an empty active-sensor list when none contributed", () => {
+    const review = generateSessionReview({ metrics: base, history: [base] });
+    expect(review.activeSensors).toEqual([]);
+  });
 });

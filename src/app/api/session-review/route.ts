@@ -2,10 +2,30 @@ import { getCurrentUser, getUserSessionId } from "@/lib/auth";
 import { ensureSession, getPrismaOrNull } from "@/lib/prisma";
 import { enforceMutationSecurity } from "@/lib/requestGuards";
 import { safeJson } from "@/lib/security";
-import { generateSessionReview } from "@/lib/sessionReview";
+import { generateSessionReview, type SensorKey } from "@/lib/sessionReview";
 import { sessionReviewSchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
+
+type PrismaClientType = NonNullable<Awaited<ReturnType<typeof getPrismaOrNull>>>;
+
+// A sensor counts as active for this session if it posted a confident snapshot recently.
+const SESSION_SENSOR_WINDOW_MS = 15 * 60 * 1000;
+
+async function getActiveSensors(client: PrismaClientType, userId: string): Promise<SensorKey[]> {
+  const recent = { userId, createdAt: { gte: new Date(Date.now() - SESSION_SENSOR_WINDOW_MS) } };
+  const [mouse, eye, voice] = await Promise.all([
+    client.mouseSignalSnapshot.findFirst({ where: recent, orderBy: { createdAt: "desc" } }),
+    client.eyeSignalSnapshot.findFirst({ where: recent, orderBy: { createdAt: "desc" } }),
+    client.voiceSignalSnapshot.findFirst({ where: recent, orderBy: { createdAt: "desc" } }),
+  ]);
+
+  const active: SensorKey[] = [];
+  if (mouse && mouse.confidence > 0) active.push("mouse");
+  if (eye && eye.confidence > 0) active.push("eye");
+  if (voice && voice.confidence > 0) active.push("voice");
+  return active;
+}
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -56,14 +76,17 @@ export async function POST(request: Request) {
 
   const user = await getCurrentUser();
   const sessionId = user ? getUserSessionId(user.id) : parsed.data.sessionId || "demo-session";
+  const client = await getPrismaOrNull();
+  const activeSensors = client && user ? await getActiveSensors(client, user.id) : [];
+
   const review = generateSessionReview({
     metrics: parsed.data.metrics,
     history: parsed.data.history,
     language: parsed.data.language,
     baselineComplete: parsed.data.baselineComplete,
     startedAt: parsed.data.startedAt,
+    activeSensors,
   });
-  const client = await getPrismaOrNull();
 
   if (!client) {
     return safeJson({ ok: true, mode: "mock", stored: false, review });

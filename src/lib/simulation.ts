@@ -34,7 +34,10 @@ export function smoothMetrics(current: CognitiveMetrics, target: CognitiveMetric
   };
 }
 
-export function generateSecureToken(seed = "NS") {
+// NOTE: This is a deterministic, date-seeded display token for the demo UI only.
+// It is NOT cryptographically secure and must never be used for auth or sessions.
+// Real auth tokens are generated with crypto.randomBytes in lib/auth.ts.
+export function generateDemoToken(seed = "NS") {
   const suffix = Math.abs(
     Array.from(`${seed}-${new Date().toISOString().slice(0, 10)}`).reduce(
       (total, character) => total + character.charCodeAt(0) * 17,

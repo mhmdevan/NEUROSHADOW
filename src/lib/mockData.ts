@@ -1,3 +1,11 @@
+// Where a set of cognitive metrics came from:
+// - "sensors": derived from the user's real mouse/eye/voice aggregates (see cognitiveModel.ts)
+// - "none": no usable live sensor signal yet — the dashboard shows an explicit "awaiting signal"
+//   state instead of any fabricated numbers.
+// - "simulated": legacy demo values. No longer produced for the live dashboard; kept only so old
+//   stored rows / types still resolve.
+export type MetricSource = "sensors" | "none" | "simulated";
+
 export type CognitiveMetrics = {
   focus: number;
   cognitiveLoad: number;
@@ -7,6 +15,7 @@ export type CognitiveMetrics = {
   collapseRisk: number;
   signalQuality: number;
   timestamp: string;
+  source?: MetricSource;
 };
 
 export type AlertType = "warning" | "critical" | "info";
@@ -66,6 +75,7 @@ export function generateMetrics(): CognitiveMetrics {
     collapseRisk,
     signalQuality,
     timestamp: new Date().toISOString(),
+    source: "simulated",
   };
 }
 
@@ -78,7 +88,24 @@ export const initialMetrics: CognitiveMetrics = {
   collapseRisk: 17,
   signalQuality: 94,
   timestamp: "2026-01-01T00:00:00.000Z",
+  source: "simulated",
 };
+
+// The honest "no live signal yet" reading. Every numeric field is 0 and the source is "none",
+// so the UI knows to render an awaiting-signal state rather than presenting fabricated values.
+export function noSignalMetrics(): CognitiveMetrics {
+  return {
+    focus: 0,
+    cognitiveLoad: 0,
+    fatigue: 0,
+    stress: 0,
+    stability: 0,
+    collapseRisk: 0,
+    signalQuality: 0,
+    timestamp: new Date().toISOString(),
+    source: "none",
+  };
+}
 
 export const alertTemplates: Omit<AlertItem, "id" | "time">[] = [
   {
@@ -166,6 +193,8 @@ export function blendMetrics(
     collapseRisk: blend(current.collapseRisk, incoming.collapseRisk),
     signalQuality: blend(current.signalQuality, incoming.signalQuality),
     timestamp: incoming.timestamp,
+    // Smoothing changes the numbers, not their origin: keep the latest known source.
+    source: incoming.source ?? current.source,
   };
 }
 

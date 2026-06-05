@@ -1,13 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { Activity, CheckCircle2, RefreshCcw, ShieldCheck, Target, TrendingUp } from "lucide-react";
 import type { WeeklyTrendSummary } from "@/lib/weeklyTrends";
+import { SignalTrendChart, type TrendSeries } from "./SignalTrendChart";
 import { useLanguage } from "./LanguageProvider";
 
 type WeeklyTrendsProps = {
   trends: WeeklyTrendSummary | null;
   loading: boolean;
   error: string | null;
+  reducedMotion?: boolean;
   onRefresh: () => void;
 };
 
@@ -15,26 +18,13 @@ function formatPercent(value: number | null) {
   return value === null ? "--" : `${value}%`;
 }
 
-function buildLine(points: WeeklyTrendSummary["signalQualityTrend"]) {
-  if (points.length === 0) return "0,40 100,40";
+const SERIES_ORDER: TrendSeries[] = ["signalQuality", "focus", "stability"];
 
-  return points
-    .map((point, index) => {
-      const x = (index / Math.max(points.length - 1, 1)) * 100;
-      const y = 42 - ((point.signalQuality ?? 0) / 100) * 34;
-      return `${x.toFixed(2)},${Math.max(5, Math.min(42, y)).toFixed(2)}`;
-    })
-    .join(" ");
-}
-
-function buildArea(line: string) {
-  return `0,44 ${line} 100,44`;
-}
-
-export function WeeklyTrends({ trends, loading, error, onRefresh }: WeeklyTrendsProps) {
+export function WeeklyTrends({ trends, loading, error, reducedMotion = false, onRefresh }: WeeklyTrendsProps) {
   const { t } = useLanguage();
-  const line = buildLine(trends?.signalQualityTrend ?? []);
+  const [series, setSeries] = useState<TrendSeries>("signalQuality");
   const empty = !trends || trends.empty;
+  const seriesLabel = (value: TrendSeries) => t.weeklyTrends.series[value === "signalQuality" ? "signal" : value];
 
   return (
     <section className="panel weekly-trends-panel" aria-live="polite">
@@ -57,6 +47,7 @@ export function WeeklyTrends({ trends, loading, error, onRefresh }: WeeklyTrends
           <TrendingUp size={28} />
           <strong>{t.weeklyTrends.emptyTitle}</strong>
           <p>{trends?.summary ?? t.weeklyTrends.emptyBody}</p>
+          <p className="weekly-trends-empty__hint">{t.weeklyTrends.emptyHint}</p>
         </div>
       ) : (
         <div className="weekly-trends-body">
@@ -98,35 +89,26 @@ export function WeeklyTrends({ trends, loading, error, onRefresh }: WeeklyTrends
           <article className="weekly-trend-chart">
             <div className="weekly-trend-chart__header">
               <strong>{t.weeklyTrends.signalTrend}</strong>
-              <span>{t.weeklyTrends.badge}</span>
+              <div className="weekly-trend-chart__series" role="group" aria-label={t.weeklyTrends.signalTrend}>
+                {SERIES_ORDER.map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={`series-toggle${series === value ? " is-active" : ""}`}
+                    aria-pressed={series === value}
+                    onClick={() => setSeries(value)}
+                  >
+                    {seriesLabel(value)}
+                  </button>
+                ))}
+              </div>
             </div>
-            <svg viewBox="0 0 100 48" role="img" aria-label={t.weeklyTrends.signalTrend} preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="weekly-signal-gradient" x1="0" x2="1" y1="0" y2="0">
-                  <stop offset="0%" stopColor="#28e7ff" />
-                  <stop offset="48%" stopColor="#9c6dff" />
-                  <stop offset="100%" stopColor="#ff4fd8" />
-                </linearGradient>
-                <linearGradient id="weekly-signal-fill" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor="#28e7ff" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="#ff4fd8" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              {[12, 22, 32, 42].map((y) => (
-                <line key={y} x1="0" x2="100" y1={y} y2={y} className="weekly-trend-grid-line" />
-              ))}
-              <polygon points={buildArea(line)} className="weekly-trend-area" />
-              <polyline points={line} className="weekly-trend-line" />
-              {trends.signalQualityTrend.map((point, index) => {
-                const x = (index / Math.max(trends.signalQualityTrend.length - 1, 1)) * 100;
-                const y = 42 - ((point.signalQuality ?? 0) / 100) * 34;
-                return <circle key={point.date} cx={x} cy={Math.max(5, Math.min(42, y))} r="1.35" className="weekly-trend-dot" />;
-              })}
-            </svg>
-            <div className="weekly-trend-labels">
-              {trends.signalQualityTrend.map((point) => (
-                <span key={point.date}>{point.label}</span>
-              ))}
+            <SignalTrendChart points={trends.signalQualityTrend} series={series} reducedMotion={reducedMotion} />
+            <div className="weekly-trend-chart__legend">
+              <span className="band-key band-key--good">{t.weeklyTrends.bands.good}</span>
+              <span className="band-key band-key--fair">{t.weeklyTrends.bands.fair}</span>
+              <span className="band-key band-key--low">{t.weeklyTrends.bands.low}</span>
+              <span className="weekly-trend-chart__hint">{t.weeklyTrends.chartHint}</span>
             </div>
           </article>
 

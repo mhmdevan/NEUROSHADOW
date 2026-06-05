@@ -61,6 +61,8 @@ export const dictionaries = {
       neuralCaption: "Live neural signal field",
       signalQuality: "signal quality",
       neuralAria: "Lightweight animated neural signal field",
+      calibrating: "Calibrating — move your mouse or enable a sensor",
+      fields: { focus: "Focus", load: "Load", stress: "Stress" },
     },
     quickActions: {
       eyebrow: "Quick actions",
@@ -103,11 +105,24 @@ export const dictionaries = {
       signalQuality: "Signal Quality",
       trend: "trend",
       loading: "Loading live simulated metrics...",
+      lowSignal: "Low signal",
+    },
+    signalSource: {
+      label: "Signal source",
+      sensors: "Live signal · from your sensors",
+      simulated: "Demo signal · simulated",
+      none: "No live signal yet",
+    },
+    signalQuality: {
+      lowTitle: "Low signal quality",
+      lowBody:
+        "These readings come from weak sensor input and may be unreliable. Move your mouse, improve lighting or speak, or re-run your baseline.",
     },
     alerts: {
       eyebrow: "AI alert panel",
       title: "Active Alerts",
       signals: "signals",
+      empty: "No active alerts — your live signal is within normal range.",
       titles: {
         "Cognitive Stability Dropping": "Cognitive Stability Dropping",
         "Attention Drift Detected": "Attention Drift Detected",
@@ -127,6 +142,35 @@ export const dictionaries = {
         "Focus signal shows a positive correction after a short drift sequence.":
           "Focus signal shows a positive correction after a short drift sequence.",
       },
+    },
+    liveAlerts: {
+      elevatedRisk: {
+        title: "Elevated decline risk",
+        body: "Combined cognitive load, fatigue and stress pushed your collapse-risk indicator up.",
+      },
+      stressSpike: {
+        title: "Stress spike detected",
+        body: "Your stress probability crossed the elevated threshold in the latest window.",
+      },
+      stabilityDrop: {
+        title: "Cognitive stability dropping",
+        body: "Your stability signal fell across the most recent monitoring window.",
+      },
+      attentionDrift: {
+        title: "Attention drift detected",
+        body: "Low focus with higher cognitive load suggests a shift away from the task.",
+      },
+      focusRecovering: {
+        title: "Focus recovering",
+        body: "Your focus signal corrected upward after a short dip.",
+      },
+    },
+    liveBoard: {
+      eyebrow: "Live cognitive board",
+      awaitingTitle: "Awaiting your live signal",
+      awaitingBody:
+        "This dashboard only shows real readings derived from your own mouse, eye, or voice analysis — never simulated values. Enable a sensor below to begin live monitoring.",
+      enableButton: "Enable a sensor",
     },
     prediction: {
       eyebrow: "Performance prediction",
@@ -170,7 +214,20 @@ export const dictionaries = {
       confidence: "Confidence",
       stored: "aggregate stored",
       localOnly: "local aggregate",
-      realEye: "Real local eye-frame analysis",
+      realEye: "Real on-device face & eye tracking (AI)",
+      backgroundHint:
+        "Camera and microphone keep analyzing even when you switch tabs or apps. Keyboard and mouse can only be measured while this tab is focused — browsers block reading input from other apps.",
+      modelLoading: "Loading face-detection model…",
+      modelUnavailable:
+        "Face-detection AI could not load. Check your connection, then toggle the camera off and on to retry.",
+      faceDetected: "Face detected",
+      faceMissing: "No face — step into the camera view",
+      facePresence: "Face presence",
+      glasses: "Glasses",
+      glassesYes: "Detected",
+      glassesNo: "Not detected",
+      glassesUncertain: "Uncertain",
+      glassesUnknown: "—",
       startEye: "Start eye analysis",
       stopEye: "Stop eye analysis",
       cameraPending: "Requesting camera permission...",
@@ -260,6 +317,16 @@ export const dictionaries = {
       },
       run: "Save personal baseline",
       scanning: "Scanning...",
+      capturing: "Capturing your baseline window",
+      captureHint: "Keep working normally for the capture window so the baseline reflects your real focus.",
+      secondsLeft: "seconds left",
+      samplesLabel: "samples",
+      sigma: "σ",
+      deviation: {
+        above: "above your baseline",
+        below: "below your baseline",
+        normal: "within your baseline",
+      },
     },
     brain: {
       eyebrow: "Cognitive brain map",
@@ -275,11 +342,21 @@ export const dictionaries = {
         ["Occipital Lobe", "Normal"],
         ["Cerebellum", "Normal"],
       ],
+      activityNote: "Projected from your live signal — an explanatory mapping, not a brain scan.",
+      lowSignalNote: "Signal too low to project region activity confidently.",
+      regionMetric: {
+        prefrontal: "Focus",
+        parietal: "Cognitive load",
+        temporal: "Stress",
+        occipital: "Stability",
+        cerebellum: "Fatigue",
+      },
     },
     logs: {
       eyebrow: "AI engine logs",
       title: "Inference Stream",
       badge: "Live internal analysis stream",
+      empty: "No engine events yet. Session actions and sensor changes will appear here.",
       messages: {
         "System initialized": "System initialized",
         "Cognitive baseline loaded": "Cognitive baseline loaded",
@@ -332,6 +409,8 @@ export const dictionaries = {
       readyMessage: "A user-scoped session review was generated.",
       failedTitle: "Review failed",
       failedMessage: "The session review service did not respond. Try again in demo mode.",
+      activeSensors: "Active sensors",
+      noSensors: "No live sensors were active in this session.",
     },
     actionRecommendation: {
       eyebrow: "Action engine",
@@ -416,6 +495,7 @@ export const dictionaries = {
       failedMessage: "Weekly trends could not be loaded.",
       emptyTitle: "No weekly trend data yet",
       emptyBody: "Run a few live sessions to build a useful seven-day reflection.",
+      emptyHint: "Tip: turn on mouse, eye, or voice analysis and run a session — your real weekly trend builds from your own signals.",
       averageFocus: "Average focus",
       averageStability: "Average stability",
       sessionsCompleted: "Sessions completed",
@@ -425,6 +505,10 @@ export const dictionaries = {
       noneYet: "None yet",
       snapshots: "snapshots",
       disclaimer: "This is a simple reflection over simulated and aggregate session data, not a medical assessment.",
+      bands: { low: "Low", fair: "Fair", good: "Good" },
+      noSession: "No session this day",
+      series: { signal: "Signal", focus: "Focus", stability: "Stability" },
+      chartHint: "Hover or focus a day to read its value",
     },
     settings: {
       eyebrow: "Settings",
@@ -672,6 +756,8 @@ export const dictionaries = {
       neuralCaption: "میدان سیگنال عصبی زنده",
       signalQuality: "کیفیت سیگنال",
       neuralAria: "میدان سیگنال عصبی سبک و متحرک",
+      calibrating: "در حال کالیبره شدن — ماوس را حرکت دهید یا یک سنسور را فعال کنید",
+      fields: { focus: "تمرکز", load: "بار", stress: "استرس" },
     },
     quickActions: {
       eyebrow: "اقدام‌های سریع",
@@ -714,11 +800,24 @@ export const dictionaries = {
       signalQuality: "کیفیت سیگنال",
       trend: "روند",
       loading: "در حال بارگذاری شاخص‌های زنده شبیه‌سازی‌شده...",
+      lowSignal: "سیگنال ضعیف",
+    },
+    signalSource: {
+      label: "منبع سیگنال",
+      sensors: "سیگنال زنده · از سنسورهای شما",
+      simulated: "سیگنال نمایشی · شبیه‌سازی‌شده",
+      none: "هنوز سیگنال زنده‌ای نیست",
+    },
+    signalQuality: {
+      lowTitle: "کیفیت سیگنال پایین",
+      lowBody:
+        "این شاخص‌ها از ورودی ضعیف سنسور به‌دست آمده‌اند و ممکن است قابل‌اتکا نباشند. ماوس را حرکت دهید، نور را بهتر کنید یا صحبت کنید، یا خط پایه را دوباره اجرا کنید.",
     },
     alerts: {
       eyebrow: "پنل هشدار هوش مصنوعی",
       title: "هشدارهای فعال",
       signals: "سیگنال",
+      empty: "هشدار فعالی نیست — سیگنال زنده شما در محدوده عادی است.",
       titles: {
         "Cognitive Stability Dropping": "کاهش پایداری شناختی",
         "Attention Drift Detected": "انحراف توجه شناسایی شد",
@@ -738,6 +837,35 @@ export const dictionaries = {
         "Focus signal shows a positive correction after a short drift sequence.":
           "سیگنال تمرکز پس از یک دوره کوتاه انحراف، اصلاح مثبت نشان می‌دهد.",
       },
+    },
+    liveAlerts: {
+      elevatedRisk: {
+        title: "ریسک افت عملکرد بالا",
+        body: "ترکیب بار شناختی، خستگی و استرس، شاخص ریسک افت عملکرد شما را بالا برده است.",
+      },
+      stressSpike: {
+        title: "افزایش ناگهانی استرس",
+        body: "احتمال استرس شما در بازه اخیر از آستانه افزایش‌یافته عبور کرد.",
+      },
+      stabilityDrop: {
+        title: "کاهش پایداری شناختی",
+        body: "سیگنال پایداری شما در آخرین بازه پایش افت کرد.",
+      },
+      attentionDrift: {
+        title: "انحراف توجه شناسایی شد",
+        body: "تمرکز پایین همراه با بار شناختی بالاتر، نشانه فاصله گرفتن از کار است.",
+      },
+      focusRecovering: {
+        title: "بازیابی تمرکز",
+        body: "سیگنال تمرکز شما پس از یک افت کوتاه، رو به بهبود رفت.",
+      },
+    },
+    liveBoard: {
+      eyebrow: "تابلوی شناختی زنده",
+      awaitingTitle: "در انتظار سیگنال زنده شما",
+      awaitingBody:
+        "این داشبورد فقط داده‌های واقعی برآمده از تحلیل ماوس، چشم یا صدای خود شما را نشان می‌دهد — هرگز مقادیر شبیه‌سازی‌شده. برای شروع پایش زنده، یک سنسور را در پایین فعال کنید.",
+      enableButton: "فعال‌سازی یک سنسور",
     },
     prediction: {
       eyebrow: "پیش‌بینی عملکرد",
@@ -781,7 +909,20 @@ export const dictionaries = {
       confidence: "اطمینان",
       stored: "aggregate ذخیره شد",
       localOnly: "aggregate محلی",
-      realEye: "تحلیل واقعی و محلی فریم چشم",
+      realEye: "ردیابی واقعی چهره و چشم روی دستگاه (هوش مصنوعی)",
+      backgroundHint:
+        "دوربین و میکروفون حتی هنگام جابه‌جایی بین تب‌ها یا برنامه‌ها به تحلیل ادامه می‌دهند. صفحه‌کلید و ماوس فقط زمانی که این تب فعال است اندازه‌گیری می‌شوند — مرورگرها خواندن ورودی از برنامه‌های دیگر را مسدود می‌کنند.",
+      modelLoading: "در حال بارگذاری مدل تشخیص چهره…",
+      modelUnavailable:
+        "مدل تشخیص چهره بارگذاری نشد. اتصال اینترنت را بررسی کنید، سپس دوربین را خاموش و روشن کنید.",
+      faceDetected: "چهره تشخیص داده شد",
+      faceMissing: "چهره‌ای نیست — وارد کادر دوربین شوید",
+      facePresence: "حضور چهره",
+      glasses: "عینک",
+      glassesYes: "دارد",
+      glassesNo: "ندارد",
+      glassesUncertain: "نامشخص",
+      glassesUnknown: "—",
       startEye: "شروع تحلیل چشم",
       stopEye: "توقف تحلیل چشم",
       cameraPending: "در حال درخواست دسترسی دوربین...",
@@ -871,6 +1012,16 @@ export const dictionaries = {
       },
       run: "ذخیره خط پایه شخصی",
       scanning: "در حال اسکن...",
+      capturing: "در حال ثبت پنجره خط پایه",
+      captureHint: "در طول پنجره ثبت، به‌طور عادی کار کنید تا خط پایه، تمرکز واقعی شما را نشان دهد.",
+      secondsLeft: "ثانیه مانده",
+      samplesLabel: "نمونه",
+      sigma: "σ",
+      deviation: {
+        above: "بالاتر از خط پایه شما",
+        below: "پایین‌تر از خط پایه شما",
+        normal: "در محدوده خط پایه شما",
+      },
     },
     brain: {
       eyebrow: "نقشه شناختی مغز",
@@ -886,11 +1037,21 @@ export const dictionaries = {
         ["لوب پس‌سری", "طبیعی"],
         ["مخچه", "طبیعی"],
       ],
+      activityNote: "برآمده از سیگنال زنده شما — یک نگاشت توضیحی، نه اسکن مغزی.",
+      lowSignalNote: "سیگنال برای نمایش مطمئن فعالیت نواحی بیش از حد ضعیف است.",
+      regionMetric: {
+        prefrontal: "تمرکز",
+        parietal: "بار شناختی",
+        temporal: "استرس",
+        occipital: "پایداری",
+        cerebellum: "خستگی",
+      },
     },
     logs: {
       eyebrow: "لاگ‌های موتور هوش مصنوعی",
       title: "جریان استنتاج",
       badge: "جریان زنده تحلیل داخلی",
+      empty: "هنوز رویدادی ثبت نشده است. اقدام‌های نشست و تغییر سنسورها اینجا نمایش داده می‌شوند.",
       messages: {
         "System initialized": "سیستم راه‌اندازی شد",
         "Cognitive baseline loaded": "خط پایه شناختی بارگذاری شد",
@@ -943,6 +1104,8 @@ export const dictionaries = {
       readyMessage: "یک بازبینی نشست مخصوص همین کاربر تولید شد.",
       failedTitle: "بازبینی ناموفق بود",
       failedMessage: "سرویس بازبینی نشست پاسخ نداد. در حالت دمو دوباره تلاش کنید.",
+      activeSensors: "سنسورهای فعال",
+      noSensors: "در این نشست هیچ سنسور زنده‌ای فعال نبود.",
     },
     actionRecommendation: {
       eyebrow: "موتور اقدام",
@@ -1027,6 +1190,7 @@ export const dictionaries = {
       failedMessage: "روندهای هفتگی بارگذاری نشد.",
       emptyTitle: "هنوز داده روند هفتگی وجود ندارد",
       emptyBody: "چند نشست زنده اجرا کنید تا بازتاب هفت‌روزه معنی‌دار شود.",
+      emptyHint: "نکته: تحلیل ماوس، چشم یا صدا را روشن کنید و یک نشست اجرا کنید تا روند هفتگی واقعی از سیگنال‌های خودتان ساخته شود.",
       averageFocus: "میانگین تمرکز",
       averageStability: "میانگین پایداری",
       sessionsCompleted: "نشست‌های کامل‌شده",
@@ -1036,6 +1200,10 @@ export const dictionaries = {
       noneYet: "هنوز هیچ‌کدام",
       snapshots: "نمونه",
       disclaimer: "این یک بازتاب ساده از داده‌های شبیه‌سازی‌شده و تجمیعی نشست است، نه ارزیابی پزشکی.",
+      bands: { low: "پایین", fair: "متوسط", good: "خوب" },
+      noSession: "این روز نشستی نبوده",
+      series: { signal: "سیگنال", focus: "تمرکز", stability: "پایداری" },
+      chartHint: "برای دیدن مقدار هر روز، نشانگر را روی آن ببرید",
     },
     settings: {
       eyebrow: "تنظیمات",

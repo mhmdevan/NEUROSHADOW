@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import type { CognitiveMetrics } from "@/lib/mockData";
+import { LOW_SIGNAL_QUALITY } from "@/lib/cognitiveModel";
 import { useLanguage } from "./LanguageProvider";
 
 type NeuralFieldProps = {
@@ -39,19 +40,35 @@ const paths = [
 
 export function NeuralField({ metrics, reducedMotion }: NeuralFieldProps) {
   const { t } = useLanguage();
+
+  // Each channel maps to a real metric so the field is honest telemetry, not ambiance.
   const intensity = Math.max(0.45, Math.min(1.18, (metrics.signalQuality + metrics.focus) / 170));
   const stress = Math.max(0.25, Math.min(1, metrics.stress / 70));
+  const quality = Math.max(0, Math.min(1, metrics.signalQuality / 100));
+  // Higher cognitive load -> faster signal flow (shorter animation duration).
+  const flowDuration = Math.max(2.4, 6 - (metrics.cognitiveLoad / 100) * 3.6);
+  // How many of the 11 nodes are "lit": low signal lights fewer, so weak input looks weak.
+  const litNodes = Math.round(4 + quality * (nodes.length - 4));
+  const lowSignal = metrics.signalQuality < LOW_SIGNAL_QUALITY;
   const motionClass = reducedMotion ? " neural-field--still" : "";
+
+  const decoderFields = [
+    { key: "focus", label: t.hero.fields.focus, value: metrics.focus, cls: "is-focus" },
+    { key: "load", label: t.hero.fields.load, value: metrics.cognitiveLoad, cls: "is-load" },
+    { key: "stress", label: t.hero.fields.stress, value: metrics.stress, cls: "is-stress" },
+  ] as const;
 
   return (
     <div
-      className={`neural-field${motionClass}`}
+      className={`neural-field${motionClass}${lowSignal ? " neural-field--low" : ""}`}
       role="img"
-      aria-label={t.hero.neuralAria}
+      aria-label={`${t.hero.neuralAria} — ${t.hero.signalQuality} ${metrics.signalQuality}%`}
       style={
         {
           "--field-intensity": intensity.toFixed(2),
           "--field-stress": stress.toFixed(2),
+          "--field-quality": quality.toFixed(2),
+          "--flow-dur": `${flowDuration.toFixed(2)}s`,
         } as CSSProperties
       }
     >
@@ -80,22 +97,39 @@ export function NeuralField({ metrics, reducedMotion }: NeuralFieldProps) {
           <path key={path} className="neural-field__path" d={path} style={{ animationDelay: `${index * 0.12}s` }} />
         ))}
         {nodes.map((node, index) => (
-          <g key={`${node.x}-${node.y}-${node.tone}`} className={`neural-field__node neural-field__node--${node.tone}`}>
+          <g
+            key={`${node.x}-${node.y}-${node.tone}`}
+            className={`neural-field__node neural-field__node--${node.tone}${index >= litNodes ? " is-dim" : ""}`}
+          >
             <circle cx={node.x} cy={node.y} r={index % 3 === 0 ? 2.25 : 1.85} />
             <circle
               cx={node.x}
               cy={node.y}
               r={index % 3 === 0 ? 6.4 : 5.2}
               className="neural-field__pulse"
-              style={{ animationDelay: `${index * 0.18}s` }}
+              style={{ animationDelay: `${index * 0.18}s`, animationDuration: `${(2.8 - stress * 0.9).toFixed(2)}s` }}
             />
           </g>
         ))}
       </svg>
       <div className="neural-field__scanner" aria-hidden="true" />
       <div className="neural-field__caption">
-        <span>{t.hero.neuralCaption}</span>
-        <strong>{metrics.signalQuality}% {t.hero.signalQuality}</strong>
+        <div className="neural-field__caption-top">
+          <span>{lowSignal ? t.hero.calibrating : t.hero.neuralCaption}</span>
+          <strong>
+            {metrics.signalQuality}% {t.hero.signalQuality}
+          </strong>
+        </div>
+        <div className="neural-field__decoder" aria-hidden="true">
+          {decoderFields.map((field) => (
+            <span key={field.key} className={`field-chip ${field.cls}`}>
+              <em>{field.label}</em>
+              <i>
+                <b style={{ width: `${Math.max(0, Math.min(100, field.value))}%` }} />
+              </i>
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );

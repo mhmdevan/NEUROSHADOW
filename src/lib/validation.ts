@@ -125,6 +125,9 @@ export type SessionReviewPayload = z.infer<typeof sessionReviewSchema>;
 export const baselineSchema = z.object({
   sessionId: z.string().trim().min(1).max(80).optional(),
   metrics: cognitiveMetricSchema,
+  // Window of readings captured during the baseline countdown. Optional for
+  // backward compatibility; the route falls back to [metrics] when absent.
+  samples: z.array(cognitiveMetricSchema).max(60).optional(),
   language: z.enum(["en", "fa"]).default("en"),
   focusSelfReport: z.coerce.number().int().min(1).max(5),
   energySelfReport: z.coerce.number().int().min(1).max(5),
@@ -191,6 +194,11 @@ export const eyeAnalysisSchema = z.object({
   frameCount: z.coerce.number().int().min(0).max(5000),
   averageLuminance: z.coerce.number().int().min(0).max(255),
   contrastLevel: z.coerce.number().int().min(0).max(255),
+  // Real face-detection outputs. Optional so older clients and the mock path still validate.
+  faceDetected: z.coerce.boolean().optional(),
+  facePresence: z.coerce.number().int().min(0).max(100).optional(),
+  glassesConfidence: z.coerce.number().int().min(0).max(100).optional(),
+  glassesDetected: z.coerce.boolean().optional(),
   timestamp: z.string().datetime().optional(),
 });
 

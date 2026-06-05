@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { summarizeActionOutcomes } from "./actionFollowUp";
+import { summarizeActionOutcomes, summarizeOutcomesByActionType } from "./actionFollowUp";
 
 describe("action follow-up summaries", () => {
   it("calculates helpful rate and top helpful action", () => {
@@ -41,5 +41,22 @@ describe("action follow-up summaries", () => {
 
     expect(stats.totalAnswered).toBe(0);
     expect(stats.summary).toContain("هنوز");
+  });
+});
+
+describe("per-action-type outcomes", () => {
+  it("counts decisive outcomes per action type and computes a helpful rate", () => {
+    const byType = summarizeOutcomesByActionType([
+      { actionType: "five_minute_break", title: "Break", status: "helpful", helpful: true, focusAfter: 4, energyAfter: 3 },
+      { actionType: "five_minute_break", title: "Break", status: "not_useful", helpful: false, focusAfter: 2, energyAfter: 2 },
+      { actionType: "turn_off_notifications", title: "Notifications", status: "not_sure", helpful: null, focusAfter: 3, energyAfter: 3 },
+    ]);
+
+    expect(byType.five_minute_break.answered).toBe(2);
+    expect(byType.five_minute_break.helpfulCount).toBe(1);
+    expect(byType.five_minute_break.notUsefulCount).toBe(1);
+    expect(byType.five_minute_break.helpfulRate).toBe(0.5);
+    // "not sure" is not decisive, so it forms no entry
+    expect(byType.turn_off_notifications).toBeUndefined();
   });
 });

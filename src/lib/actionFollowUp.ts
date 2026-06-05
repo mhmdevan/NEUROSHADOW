@@ -67,3 +67,40 @@ export function summarizeActionOutcomes(actions: ActionOutcomeRecord[], language
     summary,
   };
 }
+
+export type ActionTypeOutcome = {
+  actionType: string;
+  helpfulCount: number;
+  notUsefulCount: number;
+  answered: number;
+  helpfulRate: number; // 0..1 over decided (helpful/not-useful) follow-ups
+};
+
+// Per-action-type helpful history. The action engine uses this to promote actions a user
+// found helpful and demote ones they repeatedly marked not useful. "not sure" is excluded
+// because it is not a decisive signal.
+export function summarizeOutcomesByActionType(actions: ActionOutcomeRecord[]): Record<string, ActionTypeOutcome> {
+  const byType: Record<string, ActionTypeOutcome> = {};
+
+  for (const action of actions) {
+    const decided = action.helpful !== null && (action.status === "helpful" || action.status === "not_useful");
+    if (!decided) continue;
+
+    const entry =
+      byType[action.actionType] ??
+      { actionType: action.actionType, helpfulCount: 0, notUsefulCount: 0, answered: 0, helpfulRate: 0 };
+    entry.answered += 1;
+    if (action.helpful === true) {
+      entry.helpfulCount += 1;
+    } else {
+      entry.notUsefulCount += 1;
+    }
+    byType[action.actionType] = entry;
+  }
+
+  for (const entry of Object.values(byType)) {
+    entry.helpfulRate = entry.answered === 0 ? 0 : entry.helpfulCount / entry.answered;
+  }
+
+  return byType;
+}

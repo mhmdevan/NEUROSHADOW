@@ -18,6 +18,10 @@ type RateBucket = {
   resetAt: number;
 };
 
+// PRODUCTION NOTE: rate-limit state lives in this process's memory. It is per-instance and
+// resets on restart, which is acceptable for a single-instance deployment (see DEPLOYMENT.md).
+// For multi-instance / restart-durable limiting, replace getBuckets() with a shared store
+// (e.g. Redis/Upstash): the only seam needed is the get/set used by checkRateLimit().
 const globalForRateLimit = globalThis as unknown as {
   neuroshadowRateBuckets?: Map<string, RateBucket>;
 };

@@ -73,6 +73,7 @@ model MetricSnapshot {
   stability     Int
   collapseRisk  Int
   signalQuality Int
+  source        String?
   createdAt     DateTime @default(now())
   session       Session? @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
 
@@ -200,6 +201,13 @@ model BaselineProfile {
   stressBaseline        Int
   fatigueBaseline       Int
   collapseRiskBaseline  Int
+  focusSpread           Float?
+  stabilitySpread       Float?
+  cognitiveLoadSpread   Float?
+  stressSpread          Float?
+  fatigueSpread         Float?
+  collapseRiskSpread    Float?
+  sampleCount           Int?
   mouseStability        Int?
   eyeQuality            Int?
   voiceStability        Int?

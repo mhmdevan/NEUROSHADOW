@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   Brain,
@@ -21,7 +21,7 @@ import { ActionFollowUp, type DueActionFollowUp } from "@/components/ActionFollo
 import { ActionRecommendation } from "@/components/ActionRecommendation";
 import { AiEngineLogs } from "@/components/AiEngineLogs";
 import { AlertsPanel } from "@/components/AlertsPanel";
-import { BaselineFlow } from "@/components/BaselineFlow";
+import { BaselineFlow, type BaselineCountdown } from "@/components/BaselineFlow";
 import { CognitiveBrainMap } from "@/components/CognitiveBrainMap";
 import { CognitiveTimeline } from "@/components/CognitiveTimeline";
 import { ErrorBanner } from "@/components/ErrorBanner";
@@ -37,6 +37,7 @@ import { ReportModal } from "@/components/ReportModal";
 import { SessionReviewPanel } from "@/components/SessionReviewPanel";
 import { SessionSummary } from "@/components/SessionSummary";
 import { Sidebar } from "@/components/Sidebar";
+import { SignalSourceBadge } from "@/components/SignalSourceBadge";
 import { Topbar } from "@/components/Topbar";
 import { Toast, type ToastMessage } from "@/components/Toast";
 import { UserGuide } from "@/components/UserGuide";
@@ -44,27 +45,23 @@ import { UserStatus } from "@/components/UserStatus";
 import { WeeklyTrends } from "@/components/WeeklyTrends";
 import {
   blendMetrics,
-  createInitialMetricHistory,
-  createMetricHistory,
-  generateAlerts,
-  generateLogs,
-  initialAlerts,
-  initialLogs,
-  generateMetrics,
-  initialMetrics,
+  noSignalMetrics,
   type AlertItem,
   type CognitiveMetrics,
   type EngineLog,
 } from "@/lib/mockData";
+import { deriveLiveAlerts } from "@/lib/liveAlerts";
 import { type BaselineSelfReport, type GeneratedBaselineProfile } from "@/lib/baseline";
 import type { ActionOutcomeStats } from "@/lib/actionFollowUp";
 import { type GeneratedRecommendedAction, type RecommendedActionStatus } from "@/lib/actionEngine";
 import { type GeneratedReport } from "@/lib/reportGenerator";
 import { type GeneratedSessionReview } from "@/lib/sessionReview";
 import type { WeeklyTrendSummary } from "@/lib/weeklyTrends";
-import { generateSecureToken, getThemeIntensityLabel } from "@/lib/simulation";
+import { generateDemoToken, getThemeIntensityLabel } from "@/lib/simulation";
 import { dictionaries, getDirection, getLocale, type Language } from "@/lib/i18n";
 import { defaultSensorPrivacySettings, type SensorPrivacySettings } from "@/lib/privacy";
+import { classifySignalQuality } from "@/lib/cognitiveModel";
+import { getMetricStatus } from "@/lib/metricStatus";
 import { secureFetch } from "@/lib/clientSecurity";
 
 type HealthResponse = {
@@ -81,20 +78,9 @@ export type DashboardUser = {
   sessionId: string;
 };
 
-function getMetricStatus(metric: keyof CognitiveMetrics, value: number) {
-  if (metric === "focus" || metric === "stability" || metric === "signalQuality") {
-    if (value >= 78) return { labelKey: "good" as const, tone: "good" as const };
-    if (value >= 62) return { labelKey: "moderate" as const, tone: "moderate" as const };
-    if (value >= 50) return { labelKey: "elevated" as const, tone: "elevated" as const };
-    return { labelKey: "risk" as const, tone: "risk" as const };
-  }
-
-  if (value < 25) return { labelKey: "good" as const, tone: "good" as const };
-  if (value < 50) return { labelKey: "moderate" as const, tone: "moderate" as const };
-  if (value < 68) return { labelKey: "elevated" as const, tone: "elevated" as const };
-  if (value < 82) return { labelKey: "risk" as const, tone: "risk" as const };
-  return { labelKey: "high" as const, tone: "high" as const };
-}
+// Length of the real baseline capture window (Phase 2). Long enough to form a small
+// distribution from the live metric stream, short enough to stay practical in a demo.
+const BASELINE_CAPTURE_SECONDS = 40;
 
 function historyPoints(history: CognitiveMetrics[], key: keyof CognitiveMetrics) {
   return history.slice(-14).map((item) => Number(item[key]));
@@ -103,10 +89,10 @@ function historyPoints(history: CognitiveMetrics[], key: keyof CognitiveMetrics)
 export function DashboardApp({ user }: { user: DashboardUser }) {
   const sessionId = user.sessionId;
   const [language, setLanguage] = useState<Language>(user.locale === "fa" ? "fa" : "en");
-  const [metrics, setMetrics] = useState<CognitiveMetrics>(initialMetrics);
-  const [history, setHistory] = useState<CognitiveMetrics[]>(() => createInitialMetricHistory(32));
-  const [alerts, setAlerts] = useState<AlertItem[]>(initialAlerts);
-  const [logs, setLogs] = useState<EngineLog[]>(initialLogs);
+  const [metrics, setMetrics] = useState<CognitiveMetrics>(() => noSignalMetrics());
+  const [history, setHistory] = useState<CognitiveMetrics[]>([]);
+  const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  const [logs, setLogs] = useState<EngineLog[]>([]);
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [databaseMode, setDatabaseMode] = useState<"connected" | "mock">("mock");
   const [apiError, setApiError] = useState<string | null>(null);
@@ -116,6 +102,7 @@ export function DashboardApp({ user }: { user: DashboardUser }) {
   const [baselineRunning, setBaselineRunning] = useState(false);
   const [baselineLoading, setBaselineLoading] = useState(true);
   const [baselineProfile, setBaselineProfile] = useState<GeneratedBaselineProfile | null>(null);
+  const [baselineCountdown, setBaselineCountdown] = useState<BaselineCountdown | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [report, setReport] = useState<GeneratedReport | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
@@ -143,7 +130,12 @@ export function DashboardApp({ user }: { user: DashboardUser }) {
   const [apiPreview, setApiPreview] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [sessionStartedAt, setSessionStartedAt] = useState(() => new Date("2026-01-01T00:00:00.000Z"));
-  const secureToken = useMemo(() => generateSecureToken(sessionId), [sessionId]);
+  const secureToken = useMemo(() => generateDemoToken(sessionId), [sessionId]);
+  // Always-current metrics, so the baseline capture loop reads live values inside its closure.
+  const metricsRef = useRef(metrics);
+  useEffect(() => {
+    metricsRef.current = metrics;
+  }, [metrics]);
   const t = dictionaries[language];
   const direction = getDirection(language);
   const locale = getLocale(language);
@@ -200,33 +192,31 @@ export function DashboardApp({ user }: { user: DashboardUser }) {
       const response = await fetch("/api/metrics", { cache: "no-store" });
       if (!response.ok) throw new Error("Metrics endpoint unavailable.");
       const incoming = (await response.json()) as CognitiveMetrics;
-      setMetrics((current) => {
-        const next = blendMetrics(current, incoming, reducedMotion ? 0.55 : 0.32);
-        setHistory((items) => [...items.slice(-39), next]);
-        return next;
-      });
       setApiError(null);
+
+      if (incoming.source === "sensors") {
+        setMetrics((current) => {
+          // Smooth between real readings, but jump straight in from a no-signal state
+          // (never ramp up from fabricated zeros).
+          const previousReal = current.source === "sensors" ? current : null;
+          const next = previousReal ? blendMetrics(previousReal, incoming, reducedMotion ? 0.55 : 0.32) : incoming;
+          setHistory((items) => [...items.slice(-39), next]);
+          setAlerts(deriveLiveAlerts(next, previousReal, t));
+          return next;
+        });
+      } else {
+        // No usable live signal: show the honest awaiting-signal state, never fake numbers.
+        setMetrics(noSignalMetrics());
+        setAlerts([]);
+      }
     } catch {
-      const fallback = generateMetrics();
-      setMetrics((current) => {
-        const next = blendMetrics(current, fallback, 0.3);
-        setHistory((items) => [...items.slice(-39), next]);
-        return next;
-      });
-      setDatabaseMode("mock");
-      setApiError(t.actions.mockFallbackMessage);
-      addToast("warning", t.actions.mockFallbackTitle, t.actions.mockFallbackMessage);
+      setMetrics(noSignalMetrics());
+      setAlerts([]);
+      setApiError(t.app.backendFallback);
     } finally {
       setLoadingMetrics(false);
     }
-  }, [
-    addToast,
-    monitoringActive,
-    privacySettings.cognitive,
-    reducedMotion,
-    t.actions.mockFallbackMessage,
-    t.actions.mockFallbackTitle,
-  ]);
+  }, [monitoringActive, privacySettings.cognitive, reducedMotion, t]);
 
   const fetchCurrentBaseline = useCallback(async () => {
     try {
@@ -298,31 +288,8 @@ export function DashboardApp({ user }: { user: DashboardUser }) {
     };
   }, [fetchActionFollowUp, fetchCurrentBaseline, fetchHealth, fetchMetrics, fetchWeeklyTrends, reducedMotion]);
 
-  useEffect(() => {
-    const alertsTimer = window.setInterval(async () => {
-      try {
-        const response = await fetch("/api/alerts", { cache: "no-store" });
-        setAlerts(response.ok ? ((await response.json()) as AlertItem[]) : generateAlerts());
-      } catch {
-        setAlerts(generateAlerts());
-      }
-    }, reducedMotion ? 9000 : 6200);
-
-    const logsTimer = window.setInterval(async () => {
-      try {
-        const response = await fetch("/api/logs", { cache: "no-store" });
-        const nextLogs = response.ok ? ((await response.json()) as EngineLog[]) : generateLogs();
-        setLogs(nextLogs);
-      } catch {
-        setLogs(generateLogs());
-      }
-    }, reducedMotion ? 10000 : 4800);
-
-    return () => {
-      window.clearInterval(alertsTimer);
-      window.clearInterval(logsTimer);
-    };
-  }, [reducedMotion]);
+  // Alerts are derived from the live sensor metrics in fetchMetrics (see deriveLiveAlerts).
+  // The inference-stream log records real session events via appendLog — no mock polling.
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -368,22 +335,56 @@ export function DashboardApp({ user }: { user: DashboardUser }) {
     [metrics, t.metrics.cognitiveLoad, t.metrics.collapseRisk, t.metrics.fatigue, t.metrics.focus, t.metrics.stability, t.metrics.stress],
   );
 
+  // Only sensor-derived readings can be "low signal"; simulated values are already badged as demo.
+  const lowSignal = metrics.source === "sensors" && classifySignalQuality(metrics.signalQuality) === "low";
+  // The live board only renders real, sensor-derived readings. Without a usable signal we show
+  // an explicit awaiting-signal state instead of any fabricated numbers.
+  const hasLiveSignal = metrics.source === "sensors";
+
   function navigateTo(id: string) {
     document.getElementById(id)?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
     setActiveSection(id);
   }
 
   async function runBaselineScan(selfReport: BaselineSelfReport) {
+    if (baselineRunning) return;
     setBaselineRunning(true);
     addToast("info", t.actions.baselineStartedTitle, t.actions.baselineStartedMessage);
     appendLog("Baseline scan requested", "system");
     try {
       await secureFetch("/api/baseline/start", { method: "POST" });
-      await new Promise((resolve) => window.setTimeout(resolve, reducedMotion ? 450 : 1400));
+
+      // Capture a real window of live readings so the baseline is a distribution, not a single point.
+      const totalSeconds = reducedMotion ? 30 : BASELINE_CAPTURE_SECONDS;
+      const samples: CognitiveMetrics[] = [];
+      await new Promise<void>((resolve) => {
+        let elapsed = 0;
+        const collect = () => {
+          if (privacySettings.cognitive) {
+            samples.push(metricsRef.current);
+          }
+          setBaselineCountdown((current) => (current ? { ...current, samples: samples.length } : current));
+        };
+        setBaselineCountdown({ secondsLeft: totalSeconds, totalSeconds, samples: 0 });
+        collect();
+        const sampleTimer = window.setInterval(collect, 2500);
+        const tick = window.setInterval(() => {
+          elapsed += 1;
+          const secondsLeft = Math.max(0, totalSeconds - elapsed);
+          setBaselineCountdown((current) => (current ? { ...current, secondsLeft } : current));
+          if (secondsLeft <= 0) {
+            window.clearInterval(tick);
+            window.clearInterval(sampleTimer);
+            resolve();
+          }
+        }, 1000);
+      });
+      setBaselineCountdown(null);
+
       const response = await secureFetch("/api/baseline/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, metrics, language, ...selfReport }),
+        body: JSON.stringify({ sessionId, metrics: metricsRef.current, samples, language, ...selfReport }),
       });
       if (!response.ok) throw new Error("Baseline endpoint unavailable.");
       const payload = (await response.json()) as { baseline: GeneratedBaselineProfile };
@@ -396,6 +397,7 @@ export function DashboardApp({ user }: { user: DashboardUser }) {
       addToast("warning", t.actions.baselineFailedTitle, t.actions.baselineFailedMessage);
     } finally {
       setBaselineRunning(false);
+      setBaselineCountdown(null);
     }
   }
 
@@ -554,7 +556,7 @@ export function DashboardApp({ user }: { user: DashboardUser }) {
       appendLog("API response received", "system");
       addToast("success", t.actions.apiOnlineTitle, t.actions.apiOnlineMessage);
     } catch (error) {
-      const fallback = { database: "mock", metrics: generateMetrics(), error: error instanceof Error ? error.message : "API failed" };
+      const fallback = { database: "mock", error: error instanceof Error ? error.message : "API failed" };
       setApiPreview(JSON.stringify(fallback, null, 2));
       setDatabaseMode("mock");
       appendLog("Mock API fallback generated", "warning");
@@ -577,13 +579,13 @@ export function DashboardApp({ user }: { user: DashboardUser }) {
   }
 
   function resetSession(showToast = true) {
-    const next = generateMetrics();
-    setMetrics(next);
-    setHistory(createMetricHistory(32));
+    // Reset to the honest no-signal state — clear history/alerts/logs rather than reseeding fakes.
+    setMetrics(noSignalMetrics());
+    setHistory([]);
     setBaselineComplete(Boolean(baselineProfile));
     setSessionStartedAt(new Date());
-    setLogs(generateLogs());
-    setAlerts(generateAlerts());
+    setLogs([]);
+    setAlerts([]);
     setApiPreview(null);
     if (showToast) {
       addToast("info", t.actions.sessionResetTitle, t.actions.sessionResetMessage);
@@ -766,35 +768,68 @@ export function DashboardApp({ user }: { user: DashboardUser }) {
 
           {loadingMetrics ? <div className="loading-line">{t.metrics.loading}</div> : null}
 
-          <div className="metric-grid">
-            {metricCards.map((card) => {
-              const status = getMetricStatus(card.key, card.value);
-              return (
-                <MetricCard
-                  key={card.key}
-                  icon={card.icon}
-                  title={card.title}
-                  value={card.value}
-                  status={t.status[status.labelKey]}
-                  tone={status.tone}
-                  points={historyPoints(history, card.key)}
-                />
-              );
-            })}
+          <div className="metric-grid__header">
+            <p className="eyebrow">{t.signalSource.label}</p>
+            <SignalSourceBadge source={metrics.source} />
           </div>
 
-          <div className="dashboard-grid dashboard-grid--main">
-            <AlertsPanel alerts={alerts} />
-            <PerformancePrediction collapseRisk={metrics.collapseRisk} />
-            <UserStatus metrics={metrics} />
-            <SessionSummary
-              metrics={metrics}
-              startedAt={sessionStartedAt}
-              currentTime={currentTime ?? sessionStartedAt}
-              databaseMode={databaseMode}
-              baselineComplete={baselineComplete}
-            />
-          </div>
+          {!hasLiveSignal && !loadingMetrics ? (
+            <section className="panel awaiting-signal" role="status" aria-live="polite">
+              <Activity size={30} />
+              <p className="eyebrow">{t.liveBoard.eyebrow}</p>
+              <h2>{t.liveBoard.awaitingTitle}</h2>
+              <p>{t.liveBoard.awaitingBody}</p>
+              <button className="primary-button" type="button" onClick={() => navigateTo("live-monitor")}>
+                <Activity size={18} />
+                {t.liveBoard.enableButton}
+              </button>
+            </section>
+          ) : null}
+
+          {hasLiveSignal ? (
+            <>
+              {lowSignal ? (
+                <div className="signal-warning" role="status" aria-live="polite">
+                  <ShieldAlert size={18} />
+                  <div>
+                    <strong>{t.signalQuality.lowTitle}</strong>
+                    <p>{t.signalQuality.lowBody}</p>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="metric-grid">
+                {metricCards.map((card) => {
+                  const status = getMetricStatus(card.key, card.value);
+                  return (
+                    <MetricCard
+                      key={card.key}
+                      icon={card.icon}
+                      title={card.title}
+                      value={card.value}
+                      status={t.status[status.labelKey]}
+                      tone={status.tone}
+                      points={historyPoints(history, card.key)}
+                      lowSignal={lowSignal}
+                    />
+                  );
+                })}
+              </div>
+
+              <div className="dashboard-grid dashboard-grid--main">
+                <AlertsPanel alerts={alerts} />
+                <PerformancePrediction collapseRisk={metrics.collapseRisk} />
+                <UserStatus metrics={metrics} />
+                <SessionSummary
+                  metrics={metrics}
+                  startedAt={sessionStartedAt}
+                  currentTime={currentTime ?? sessionStartedAt}
+                  databaseMode={databaseMode}
+                  baselineComplete={baselineComplete}
+                />
+              </div>
+            </>
+          ) : null}
         </section>
 
         <section className="dashboard-section" id="baseline" data-nav-section>
@@ -811,17 +846,18 @@ export function DashboardApp({ user }: { user: DashboardUser }) {
               baseline={baselineProfile}
               loading={baselineLoading}
               running={baselineRunning}
+              countdown={baselineCountdown}
               onRun={(selfReport) => void runBaselineScan(selfReport)}
             />
           </div>
         </section>
 
-        <LiveInputMonitor metrics={metrics} sessionId={sessionId} privacySettings={privacySettings} />
+        <LiveInputMonitor sessionId={sessionId} privacySettings={privacySettings} />
 
         <section className="dashboard-section" id="ai-analysis" data-nav-section>
           <div className="dashboard-grid dashboard-grid--analysis">
             <CognitiveBrainMap metrics={metrics} reducedMotion={reducedMotion} />
-            <AiEngineLogs logs={logs} />
+            <AiEngineLogs logs={logs} source={metrics.source} />
           </div>
           <CognitiveTimeline history={history} />
         </section>
@@ -869,6 +905,7 @@ export function DashboardApp({ user }: { user: DashboardUser }) {
             trends={weeklyTrends}
             loading={weeklyTrendsLoading}
             error={weeklyTrendsError}
+            reducedMotion={reducedMotion}
             onRefresh={() => void fetchWeeklyTrends()}
           />
         </section>
